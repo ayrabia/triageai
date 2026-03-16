@@ -16,7 +16,7 @@ from classifier.prompts import get_prompt
 
 load_dotenv()
 
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+CLAUDE_MODEL = "claude-sonnet-4-6"
 OPENAI_MODEL = "gpt-4o"
 
 
@@ -126,6 +126,9 @@ def classify_referral(
             result_dict, model_used = _classify_with_claude(system_prompt, user_message)
         except Exception as e:
             last_error = f"Claude error: {e}"
+            print(f"[TriageAI] Claude failed: {e}")  # visible in terminal
+    else:
+        print("[TriageAI] ANTHROPIC_API_KEY not found in environment")
 
     # Fallback to OpenAI
     if not result_dict and os.environ.get("OPENAI_API_KEY"):

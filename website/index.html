@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TriageAI — AI-Powered Referral Triage</title>
+  <meta name="description" content="TriageAI automatically classifies incoming referrals as URGENT, ROUTINE, or NEEDS REVIEW — so no critical patient ever gets buried in a backlog." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      color: #1a1a2e;
+      line-height: 1.6;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ─── NAV ─── */
+    .nav {
+      background: #0a1628;
+      padding: 18px 0;
+    }
+    .nav .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .nav-logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.5px;
+    }
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .nav-tagline {
+      color: rgba(255,255,255,0.7);
+      font-size: 0.875rem;
+    }
+    .nav-email {
+      color: #5eead4;
+      font-size: 0.875rem;
+    }
+    .nav-email:hover { text-decoration: underline; }
+
+    /* ─── HERO ─── */
+    .hero {
+      background: #0a1628;
+      padding: 80px 0 72px;
+      text-align: center;
+    }
+    .hero h1 {
+      color: #fff;
+      font-size: 2.75rem;
+      font-weight: 800;
+      line-height: 1.15;
+      max-width: 780px;
+      margin: 0 auto 24px;
+    }
+    .hero p {
+      color: rgba(255,255,255,0.78);
+      font-size: 1.15rem;
+      max-width: 640px;
+      margin: 0 auto 32px;
+      line-height: 1.7;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.7);
+      font-size: 0.8rem;
+      padding: 6px 18px;
+      border-radius: 999px;
+      letter-spacing: 0.3px;
+    }
+
+    /* ─── STATS BAR ─── */
+    .stats {
+      background: #f0f2f5;
+      padding: 40px 0;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      text-align: center;
+    }
+    .stat-item strong {
+      display: block;
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #0a1628;
+      margin-bottom: 6px;
+    }
+    .stat-item span {
+      font-size: 0.85rem;
+      color: #555;
+      line-height: 1.5;
+    }
+
+    /* ─── SECTION HELPERS ─── */
+    .section {
+      padding: 72px 0;
+    }
+    .section-gray {
+      background: #f0f2f5;
+    }
+    .section-navy {
+      background: #0a1628;
+      color: #fff;
+    }
+    .section-title {
+      font-size: 2rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 48px;
+      color: #0a1628;
+    }
+    .section-navy .section-title { color: #fff; }
+
+    /* ─── PROBLEM ─── */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: start;
+    }
+    .problem-text {
+      font-size: 1.05rem;
+      color: #333;
+      line-height: 1.8;
+    }
+    .quote-block {
+      background: #f8f9fb;
+      border-left: 4px solid #0a1628;
+      padding: 28px 32px;
+      border-radius: 0 8px 8px 0;
+    }
+    .quote-block p {
+      font-style: italic;
+      font-size: 1.05rem;
+      color: #333;
+      line-height: 1.7;
+      margin-bottom: 16px;
+    }
+    .quote-block cite {
+      font-style: normal;
+      font-size: 0.85rem;
+      color: #666;
+      display: block;
+    }
+
+    /* ─── SOLUTION ─── */
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 32px;
+      text-align: center;
+    }
+    .step-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 40px 28px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .step-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: #0a1628;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+    }
+    .step-number {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #5eead4;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .step-card h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #0a1628;
+    }
+    .step-card p {
+      font-size: 0.9rem;
+      color: #555;
+      line-height: 1.6;
+    }
+
+    /* ─── FEATURES ─── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .feature-card {
+      background: #f8f9fb;
+      border-radius: 10px;
+      padding: 32px 28px;
+      border: 1px solid #e8eaee;
+    }
+    .feature-card h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #0a1628;
+    }
+    .feature-card p {
+      font-size: 0.88rem;
+      color: #555;
+      line-height: 1.5;
+    }
+    .feature-icon {
+      font-size: 1.6rem;
+      margin-bottom: 14px;
+      display: block;
+    }
+
+    /* ─── COMPARISON TABLE ─── */
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .comparison-table th,
+    .comparison-table td {
+      padding: 16px 24px;
+      text-align: left;
+      font-size: 0.92rem;
+    }
+    .comparison-table thead th {
+      background: #0a1628;
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .comparison-table tbody tr {
+      border-bottom: 1px solid #eee;
+    }
+    .comparison-table tbody tr:last-child {
+      border-bottom: none;
+    }
+    .comparison-table td:first-child {
+      font-weight: 600;
+      color: #0a1628;
+    }
+    .comparison-table td:nth-child(3) {
+      color: #0a1628;
+      font-weight: 500;
+    }
+
+    /* ─── CTA ─── */
+    .cta {
+      text-align: center;
+    }
+    .cta h2 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+    .cta p {
+      color: rgba(255,255,255,0.78);
+      font-size: 1.05rem;
+      max-width: 600px;
+      margin: 0 auto 36px;
+      line-height: 1.7;
+    }
+    .cta-email {
+      display: inline-block;
+      background: #5eead4;
+      color: #0a1628;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 16px 40px;
+      border-radius: 8px;
+      transition: background 0.2s;
+    }
+    .cta-email:hover {
+      background: #99f6e4;
+    }
+
+    /* ─── FOOTER ─── */
+    .footer {
+      background: #060e1a;
+      padding: 28px 0;
+      text-align: center;
+      color: rgba(255,255,255,0.45);
+      font-size: 0.82rem;
+    }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 900px) {
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .steps-grid { grid-template-columns: 1fr; }
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+      .problem-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .hero h1 { font-size: 1.85rem; }
+      .hero p { font-size: 1rem; }
+      .hero { padding: 56px 0 48px; }
+      .section { padding: 48px 0; }
+      .section-title { font-size: 1.5rem; margin-bottom: 32px; }
+      .stats-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
+      .stat-item strong { font-size: 1.1rem; }
+      .features-grid { grid-template-columns: 1fr; }
+      .comparison-table th, .comparison-table td { padding: 12px 14px; font-size: 0.82rem; }
+      .nav .container { justify-content: center; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <div class="container">
+      <div class="nav-logo">TriageAI</div>
+      <div class="nav-right">
+        <span class="nav-tagline">AI-Powered Referral Triage</span>
+        <a href="mailto:ayman@usetriageai.com" class="nav-email">ayman@usetriageai.com</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="container">
+      <h1>Specialty Clinics Are Drowning in Fax Referrals. We Fix That.</h1>
+      <p>TriageAI automatically classifies incoming referrals as URGENT, ROUTINE, or NEEDS REVIEW &mdash; so no critical patient ever gets buried in a backlog.</p>
+      <span class="hero-badge">Pre-Seed &middot; Healthcare AI &middot; San Jose, CA</span>
+    </div>
+  </section>
+
+  <!-- STATS BAR -->
+  <section class="stats">
+    <div class="container">
+      <div class="stats-grid">
+        <div class="stat-item">
+          <strong>150+</strong>
+          <span>referrals/day at our first design partner</span>
+        </div>
+        <div class="stat-item">
+          <strong>4,000+</strong>
+          <span>referral backlog with no way to sort</span>
+        </div>
+        <div class="stat-item">
+          <strong>~50%</strong>
+          <span>of referrals never complete</span>
+        </div>
+        <div class="stat-item">
+          <strong>$971K</strong>
+          <span>lost per physician per year</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROBLEM -->
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">The Problem</h2>
+      <div class="problem-grid">
+        <div class="problem-text">
+          Specialty clinic staff spend hours every day clicking through hundreds of incoming fax referrals. These documents are named only by fax number, with no way to identify which patients need urgent care. Critical referrals get buried in backlogs of thousands, leading to delayed treatment, lost revenue, and patient safety risks.
+        </div>
+        <div class="quote-block">
+          <p>&ldquo;There is no fast way to sort &mdash; documents are named by fax number so you have to click every single one.&rdquo;</p>
+          <cite>&mdash; Referral Coordinator, ENT Clinic (Design Partner #1)</cite>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SOLUTION -->
+  <section class="section section-gray">
+    <div class="container">
+      <h2 class="section-title">How TriageAI Works</h2>
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-icon">&#128224;</div>
+          <div class="step-number">Step 1</div>
+          <h3>Fax Arrives</h3>
+          <p>Receives fax via HIPAA-compliant API automatically.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-icon">&#129302;</div>
+          <div class="step-number">Step 2</div>
+          <h3>AI Extracts &amp; Classifies</h3>
+          <p>Medical NLP extracts diagnoses, symptoms, and flags urgency.</p>
+        </div>
+        <div class="step-card">
+          <div class="step-icon">&#128202;</div>
+          <div class="step-number">Step 3</div>
+          <h3>Staff See Priorities</h3>
+          <p>Triage dashboard shows URGENT first, missing info flagged.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="section">
+    <div class="container">
+      <h2 class="section-title">Built for Small Specialty Clinics</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <span class="feature-icon">&#128224;</span>
+          <h3>Fax Ingestion</h3>
+          <p>Automatically receives and digitizes incoming fax referrals in real time.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">&#128196;</span>
+          <h3>AI OCR + Extraction</h3>
+          <p>Extracts patient data, diagnoses, and clinical notes from scanned documents.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">&#9888;&#65039;</span>
+          <h3>Urgency Classification</h3>
+          <p>Labels each referral as URGENT, ROUTINE, or NEEDS REVIEW automatically.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">&#128269;</span>
+          <h3>Missing Info Detection</h3>
+          <p>Flags referrals with incomplete insurance, demographics, or clinical data.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">&#128187;</span>
+          <h3>Triage Dashboard</h3>
+          <p>Clean interface showing prioritized referrals so staff work on what matters first.</p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">&#128274;</span>
+          <h3>HIPAA Compliant</h3>
+          <p>End-to-end encryption and BAA-ready infrastructure for protected health data.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPARISON -->
+  <section class="section section-gray">
+    <div class="container">
+      <h2 class="section-title">Why Not Tennr?</h2>
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Tennr</th>
+            <th>TriageAI</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Target Customer</td>
+            <td>Large health systems</td>
+            <td>Small specialty clinics (1–10 providers)</td>
+          </tr>
+          <tr>
+            <td>Pricing</td>
+            <td>Enterprise contracts ($$$)</td>
+            <td>Affordable per-clinic plans</td>
+          </tr>
+          <tr>
+            <td>Deployment</td>
+            <td>Months-long onboarding</td>
+            <td>Live in days, not months</td>
+          </tr>
+          <tr>
+            <td>Triage Intelligence</td>
+            <td>General document processing</td>
+            <td>Purpose-built urgency classification</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section section-navy cta">
+    <div class="container">
+      <h2>Currently in Customer Discovery</h2>
+      <p>We're conducting interviews with specialty clinic staff across ENT, Cardiology, Orthopedics, and Neurology. If you work in referral coordination or clinic administration, we'd love 20 minutes of your time.</p>
+      <a href="mailto:ayman@usetriageai.com" class="cta-email">ayman@usetriageai.com</a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="container">
+      &copy; 2026 TriageAI &middot; usetriageai.com &middot; San Jose, CA &middot; Pre-Seed Stage
+    </div>
+  </footer>
+
+</body>
+</html>
