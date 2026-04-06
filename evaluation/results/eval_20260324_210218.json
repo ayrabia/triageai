@@ -1,0 +1,87 @@
+{
+  "evaluation_timestamp": "2026-03-24T21:02:18.856170",
+  "pipeline_version": "v2_three_tier",
+  "summary": {
+    "total_referrals": 6,
+    "correct": 6,
+    "accuracy": 1.0
+  },
+  "per_tier_metrics": {
+    "PRIORITY REVIEW": {
+      "true_positives": 3,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "SECONDARY APPROVAL": {
+      "true_positives": 3,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    }
+  },
+  "critical_safety": {
+    "missed_priority_review_count": 0,
+    "missed_priority_review_ids": []
+  },
+  "per_referral": [
+    {
+      "referral_id": "R01",
+      "file": "Referral01.pdf",
+      "pipeline_version": "v2_three_tier",
+      "raw_action": "FLAGGED FOR PRIORITY REVIEW",
+      "predicted": "PRIORITY REVIEW",
+      "ground_truth": "PRIORITY REVIEW",
+      "correct": true
+    },
+    {
+      "referral_id": "R02",
+      "file": "Referral02.pdf",
+      "pipeline_version": "v2_three_tier",
+      "raw_action": "STANDARD QUEUE",
+      "predicted": "SECONDARY APPROVAL",
+      "ground_truth": "SECONDARY APPROVAL",
+      "correct": true
+    },
+    {
+      "referral_id": "R03",
+      "file": "Referral03.pdf",
+      "pipeline_version": "v2_three_tier",
+      "raw_action": "FLAGGED FOR PRIORITY REVIEW",
+      "predicted": "PRIORITY REVIEW",
+      "ground_truth": "PRIORITY REVIEW",
+      "correct": true
+    },
+    {
+      "referral_id": "R04",
+      "file": "Referral04.pdf",
+      "pipeline_version": "v2_three_tier",
+      "raw_action": "FLAGGED FOR PRIORITY REVIEW",
+      "predicted": "PRIORITY REVIEW",
+      "ground_truth": "PRIORITY REVIEW",
+      "correct": true
+    },
+    {
+      "referral_id": "R05",
+      "file": "Referral05.pdf",
+      "pipeline_version": "v2_three_tier",
+      "raw_action": "STANDARD QUEUE",
+      "predicted": "SECONDARY APPROVAL",
+      "ground_truth": "SECONDARY APPROVAL",
+      "correct": true
+    },
+    {
+      "referral_id": "R06",
+      "file": "Referral06.pdf",
+      "pipeline_version": "v2_three_tier",
+      "raw_action": "STANDARD QUEUE",
+      "predicted": "SECONDARY APPROVAL",
+      "ground_truth": "SECONDARY APPROVAL",
+      "correct": true
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "evaluation_timestamp": "2026-03-24T22:44:20.467993",
+  "dataset": "v3_notriage",
+  "scenario": "Production \u2014 no prior triage decisions visible",
+  "pipeline_version": "v2_three_tier",
+  "summary": {
+    "total_referrals": 6,
+    "correct": 5,
+    "accuracy": 0.8333
+  },
+  "per_tier_metrics": {
+    "PRIORITY REVIEW": {
+      "true_positives": 3,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "SECONDARY APPROVAL": {
+      "true_positives": 2,
+      "false_positives": 0,
+      "false_negatives": 1,
+      "precision": 1.0,
+      "recall": 0.6667,
+      "f1": 0.8
+    }
+  },
+  "critical_safety": {
+    "missed_priority_review_count": 0,
+    "missed_priority_review_ids": [],
+    "unexpected_standard_queue_count": 1,
+    "unexpected_standard_queue_ids": [
+      "R06"
+    ]
+  },
+  "per_referral": [
+    {
+      "referral_id": "R01",
+      "file": "Training_Referral01.pdf",
+      "pipeline_version": "v2_three_tier",
+      "raw_action": "FLAGGED FOR PRIORITY REVIEW",
+      "predicted": "PRIORITY REVIEW",
+      "ground_truth": "PRIORITY REVIEW",
+      "correct": true
+    },
+    {
+      "referral_id": "R02",
+      "file": "Training_Referral02.pdf",
+      "pipeline_version": "v2_three_tier",
+      "raw_action": "SECONDARY APPROVAL NEEDED",
+      "predicted": "SECONDARY APPROVAL",
+      "ground_truth": "SECONDARY APPROVAL",
+      "correct": true
+    },
+    {
+      "referral_id": "R03",
+      "file": "Training_Referral03.pdf",
+      "pipeline_version": "v2_three_tier",
+      "raw_action": "FLAGGED FOR PRIORITY REVIEW",
+      "predicted": "PRIORITY REVIEW",
+      "ground_truth": "PRIORITY REVIEW",
+      "correct": true
+    },
+    {
+      "referral_id": "R04",
+      "file": "Training_Referral04.pdf",
+      "pipeline_version": "v2_three_tier",
+      "raw_action": "FLAGGED FOR PRIORITY REVIEW",
+      "predicted": "PRIORITY REVIEW",
+      "ground_truth": "PRIORITY REVIEW",
+      "correct": true
+    },
+    {
+      "referral_id": "R05",
+      "file": "Training_Referral05.pdf",
+      "pipeline_version": "v2_three_tier",
+      "raw_action": "SECONDARY APPROVAL NEEDED",
+      "predicted": "SECONDARY APPROVAL",
+      "ground_truth": "SECONDARY APPROVAL",
+      "correct": true
+    },
+    {
+      "referral_id": "R06",
+      "file": "Training_Referral06.pdf",
+      "pipeline_version": "v2_three_tier",
+      "raw_action": "STANDARD QUEUE",
+      "predicted": "STANDARD QUEUE",
+      "ground_truth": "SECONDARY APPROVAL",
+      "correct": false
+    }
+  ]
+}

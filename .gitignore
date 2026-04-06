@@ -95,3 +95,10 @@ logs/
 
 # Claude Code
 .claude/settings.local.json
+
+# Next.js build output
+frontend/.next/
+frontend/next-env.d.ts
+
+# Referral PDFs — large binary files, store in S3 not git
+referrals/**/*.pdf

@@ -1,0 +1,82 @@
+import Link from 'next/link'
+import PriorityBadge from './PriorityBadge'
+import { ACTION_CONFIG, STATUS_CONFIG, formatRelativeTime } from '@/lib/utils'
+import type { ReferralSummary } from '@/lib/types'
+
+interface Props {
+  referral: ReferralSummary
+}
+
+export default function QueueCard({ referral }: Props) {
+  const cfg = referral.action ? ACTION_CONFIG[referral.action] : null
+  const statusCfg = STATUS_CONFIG[referral.status]
+  const missingCount = referral.missing_information?.length ?? 0
+
+  return (
+    <Link href={`/referrals/${referral.id}`}>
+      <div
+        className={`
+          group relative flex flex-col gap-3 rounded-xl border border-slate-200 bg-white
+          p-5 shadow-sm transition-all duration-150
+          border-l-4 ${cfg?.borderColor ?? 'border-l-slate-200'}
+          hover:shadow-md hover:border-slate-300 cursor-pointer
+        `}
+      >
+        {/* Top row */}
+        <div className="flex items-center justify-between gap-3">
+          <PriorityBadge action={referral.action} />
+          <div className="flex items-center gap-2">
+            {referral.status !== 'pending' && (
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.color}`}>
+                {statusCfg.label}
+              </span>
+            )}
+            {missingCount > 0 && (
+              <span className="flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-600">
+                <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                </svg>
+                {missingCount} missing
+              </span>
+            )}
+            <span className="text-xs text-slate-400">
+              {formatRelativeTime(referral.received_at)}
+            </span>
+          </div>
+        </div>
+
+        {/* Referral reason */}
+        <p className="line-clamp-2 text-sm font-medium leading-snug text-slate-800">
+          {referral.referral_reason ?? 'Processing…'}
+        </p>
+
+        {/* Summary */}
+        {referral.summary && (
+          <p className="line-clamp-1 text-xs leading-relaxed text-slate-500">
+            {referral.summary}
+          </p>
+        )}
+
+        {/* Bottom row */}
+        <div className="flex items-center justify-between pt-1">
+          {referral.recommended_window ? (
+            <span className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+              <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5" />
+              </svg>
+              Schedule: {referral.recommended_window}
+            </span>
+          ) : (
+            <span />
+          )}
+          <svg
+            className="h-4 w-4 text-slate-300 transition-colors group-hover:text-slate-500"
+            fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+        </div>
+      </div>
+    </Link>
+  )
+}
