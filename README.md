@@ -1,6 +1,6 @@
 # TriageAI
 
-![Status](https://img.shields.io/badge/Status-Pre--Seed%20%2F%20Concept%20Stage-orange)
+![Status](https://img.shields.io/badge/Status-Pre--Seed%20%2F%20Prototype%20Built-blue)
 ![Python](https://img.shields.io/badge/Python-3.11+-blue)
 ![License](https://img.shields.io/badge/License-Proprietary-red)
 ![HIPAA](https://img.shields.io/badge/HIPAA-Compliant%20Design-green)
@@ -22,9 +22,8 @@ Specialty clinics are buried under referral backlogs — and the consequences ar
 | Referrals that never complete care | ~50% |
 | Revenue lost per physician per year | $821K–$971K |
 | Time spent on manual triage | 3–4 hours per person per day |
-| Physician burnout rotation | Monthly, just to prevent burnout |
 
-Every fax arrives named only by its fax number. Staff click through each document one by one with no idea what's inside. A suspected cancer diagnosis sits in the same undifferentiated pile as a routine follow-up. Urgent patients — nasal fractures with a 1–2 week surgical window, infants with tongue ties unable to feed — wait.
+Every fax arrives named only by its fax number. Staff click through each document one by one with no idea what's inside. A suspected cancer diagnosis sits in the same undifferentiated pile as a routine follow-up.
 
 **This is an administrative workflow failure, not a clinical one. We fix the workflow.**
 
@@ -32,53 +31,38 @@ Every fax arrives named only by its fax number. Staff click through each documen
 
 ## The Solution
 
-TriageAI ingests faxed referrals, extracts clinical information, and classifies each one as **URGENT**, **ROUTINE**, or **NEEDS REVIEW** — with a plain-language reason and the extracted keywords used to make the decision.
+TriageAI ingests faxed referrals, extracts clinical information using Claude via AWS Bedrock, and classifies each one into a three-tier priority system. Staff see a **prioritized queue** instead of a pile of unnamed documents.
 
-Staff see a **prioritized queue** instead of a pile of unnamed documents.
+### Three-Tier Classification
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Referral Queue — ENT Clinic                    150 today   │
-├──────┬──────────────────────────────┬───────────┬───────────┤
-│  ID  │  Summary                     │  Priority │  Age      │
-├──────┼──────────────────────────────┼───────────┼───────────┤
-│ 1042 │ Rapidly growing neck mass    │ 🔴 URGENT │  2 hrs    │
-│ 1039 │ Suspected oral carcinoma     │ 🔴 URGENT │  4 hrs    │
-│ 1051 │ Nasal fracture — 10 days ago │ 🔴 URGENT │  1 hr     │
-│ 1044 │ Infant tongue tie, feeding ↓ │ 🔴 URGENT │  3 hrs    │
-│ 1038 │ [Missing imaging, no notes]  │ 🟡 REVIEW │  5 hrs    │
-│ 1033 │ Hearing loss, child, stable  │ 🟢 ROUTINE│  8 hrs    │
-└──────┴──────────────────────────────┴───────────┴───────────┘
-```
+| Tier | When it fires |
+|------|--------------|
+| **PRIORITY REVIEW** | Clinical content matches urgent criteria — regardless of provider label |
+| **SECONDARY APPROVAL** | Provider marked urgent/STAT but no clinical criteria matched — never silently downgrade |
+| **STANDARD QUEUE** | No criteria matched AND provider did not mark urgent (both agree it's routine) |
 
-### Classification Output
-
-Each referral returns:
-
-```json
-{
-  "classification": "URGENT",
-  "reason": "Referral describes a rapidly growing neck mass with 3-week progression. Suspected malignancy requires prompt evaluation.",
-  "extracted_keywords": ["rapidly growing neck mass", "3-week progression", "firm on palpation", "no prior imaging"],
-  "confidence": 0.94,
-  "missing_info": ["CT neck with contrast", "lab results"]
-}
-```
+**Safety principle:** STANDARD QUEUE only fires when both clinical content AND provider label agree it's routine.
 
 ---
 
-## Competitor Comparison
+## Current Status (April 2026)
 
-| Feature | Tennr | **TriageAI** |
-|---------|-------|--------------|
-| Target customer | Large health systems | **1–10 provider specialty clinics** |
-| EHR integration required | Yes | **No — self-serve** |
-| Urgency triage | No | **Yes — core feature** |
-| Specialty-specific criteria | No | **Yes (ENT, Cardiology, Ortho, Neuro, GI)** |
-| Missing info detection | Partial | **Yes — with callback prompts** |
-| Setup time | Weeks–months | **Days** |
-| Pricing | Enterprise contract | **$200–$350/provider/month** |
-| HIPAA compliant | Yes | **Yes** |
+- **POC validated** on 6 real de-identified ENT referrals from Sacramento ENT — 0 missed urgents, 0 silent downgrades
+- **Backend complete** — FastAPI + PostgreSQL with full queue, detail, status update, and audit trail endpoints
+- **Frontend complete** — Next.js queue view + referral detail page with auto-refresh
+- **Awaiting clinical validation** from Nadia Rabia (Referral Coordinator, SacENT)
+- Pre-seed / concept stage
+
+### v3 Evaluation Results
+
+| Referral | Condition | Classification |
+|---|---|---|
+| R01 | Thyroid carcinoma | PRIORITY REVIEW ✓ |
+| R02 | Tinnitus/hearing loss | SECONDARY APPROVAL ✓ |
+| R03 | Tongue base mass (suspected SCC) | PRIORITY REVIEW ✓ |
+| R04 | Nasal fracture (delayed healing) | PRIORITY REVIEW ✓ |
+| R05 | Tonsillar cyst/polyp | SECONDARY APPROVAL ✓ |
+| R06 | Pediatric recurrent otitis media | SECONDARY APPROVAL ✓ (after bug fix) |
 
 ---
 
@@ -86,16 +70,16 @@ Each referral returns:
 
 | Layer | Technology |
 |-------|------------|
-| Fax ingestion | Phaxio / Documo API (HIPAA-compliant) |
-| OCR | AWS Textract |
-| Medical NLP | AWS Comprehend Medical |
-| Urgency classifier | Claude API (claude-sonnet-4-20250514) |
-| Backend | Python / FastAPI |
-| Frontend | React + Tailwind CSS |
+| LLM / OCR | Claude Sonnet 4.6 via AWS Bedrock (primary), GPT-4o fallback |
+| Backend | FastAPI + Uvicorn |
+| Frontend | Next.js 14 + Tailwind CSS |
+| Database | PostgreSQL (Docker locally, AWS RDS in production) |
+| Migrations | Alembic |
+| Fax ingestion | Phaxio / Documo (planned) |
+| Auth | Auth0 / AWS Cognito (planned) |
 | Demo UI | Streamlit |
-| Database | PostgreSQL (AWS RDS) |
-| Auth | Auth0 / AWS Cognito |
 | Encryption | AES-256 at rest, TLS 1.2+ in transit |
+| Cloud | AWS (Bedrock, S3, Textract, RDS) — all under existing AWS BAA |
 
 ---
 
@@ -104,26 +88,59 @@ Each referral returns:
 ### Prerequisites
 
 - Python 3.11+
-- An Anthropic API key (or OpenAI API key as fallback)
+- Node.js 18+
+- Docker (for local PostgreSQL)
+- AWS credentials configured (for pipeline runs)
 
-### Setup
+### Backend Setup
 
 ```bash
-# Clone the repo
+# Clone and enter the repo
 git clone https://github.com/ayrabia/triageai.git
 cd triageai
 
 # Create virtual environment
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate
 
 # Install dependencies
 pip install -r requirements.txt
 
 # Configure environment
 cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
+# Edit .env — set DATABASE_URL and AWS credentials
+
+# Start local PostgreSQL
+docker run -d \
+  --name triageai-pg \
+  -e POSTGRES_USER=triageai \
+  -e POSTGRES_PASSWORD=password \
+  -e POSTGRES_DB=triageai \
+  -p 5432:5432 \
+  postgres:16
+
+# Run migrations
+alembic upgrade head
+
+# Seed with de-identified test referrals
+python scripts/seed.py
+
+# Start the API
+uvicorn app.main:app --reload
 ```
+
+API docs at [http://localhost:8000/docs](http://localhost:8000/docs)
+
+### Frontend Setup
+
+```bash
+cd frontend
+cp .env.local.example .env.local
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000)
 
 ### Run the Streamlit Demo
 
@@ -131,15 +148,22 @@ cp .env.example .env
 streamlit run streamlit_demo/demo.py
 ```
 
-Open [http://localhost:8501](http://localhost:8501) — paste a referral or click a one-click example.
+### Share the Demo via ngrok
 
-### Run the FastAPI Backend
+ngrok lets you expose the local app to anyone with a URL — useful for showing the queue to Nadia or other stakeholders without deploying.
+
+**How it works:** The Next.js frontend proxies all `/api/*` calls to the FastAPI backend on localhost:8000 (via `next.config.mjs`). Only port 3000 needs to be tunneled — the backend never needs to be public-facing.
 
 ```bash
-uvicorn app.main:app --reload
+# 1. Make sure both services are running (backend on :8000, frontend on :3000)
+
+# 2. Tunnel the frontend — rewrite the Host header so Next.js dev server accepts the ngrok domain
+ngrok http --host-header=rewrite 3000
 ```
 
-API docs at [http://localhost:8000/docs](http://localhost:8000/docs)
+ngrok will print a forwarding URL like `https://abc123.ngrok-free.app`. Share that URL — it proxies through Next.js to the local FastAPI backend.
+
+> **Note:** The ngrok URL is public while the tunnel is running. Only share it during active demos and stop the tunnel when done. Do not run real patient data through a local demo session.
 
 ### Run Tests
 
@@ -153,30 +177,84 @@ pytest classifier/test_classifier.py -v
 
 ```
 triageai/
-├── README.md                          # This file
-├── .gitignore
+├── README.md
+├── CLAUDE.md                              # AI context + HIPAA rules
 ├── requirements.txt
-├── .env.example                       # Environment variable template
-├── classifier/
-│   ├── classifier.py                  # Core urgency classifier (Claude API)
-│   ├── prompts.py                     # Prompt templates per specialty
-│   └── test_classifier.py             # Unit tests with synthetic referrals
-├── pipeline/
-│   ├── ocr.py                         # AWS Textract wrapper
-│   ├── nlp.py                         # AWS Comprehend Medical wrapper
-│   └── missing_info.py                # Missing info detection per specialty
+├── .env.example
+├── Procfile                               # Railway/Heroku deploy
+├── runtime.txt                            # Python version
+├── start.sh                               # Production startup script
+│
+├── db/
+│   ├── enums.py                           # ReferralStatus, ReferralAction, UserRole
+│   ├── models.py                          # SQLAlchemy ORM models
+│   └── session.py                         # DB engine + get_db dependency
+│
+├── alembic/
+│   ├── env.py
+│   └── versions/
+│       └── 0001_initial_schema.py         # Full schema migration
+│
 ├── app/
-│   ├── main.py                        # FastAPI app entry point
+│   ├── main.py                            # FastAPI entry point
+│   ├── dependencies.py                    # get_db, get_current_user
 │   └── routes/
-│       ├── referrals.py               # POST /referrals
-│       └── health.py                  # GET /health
+│       ├── referrals.py                   # Queue, detail, ingest, status, audit
+│       └── health.py                      # GET /health
+│
+├── pipeline/
+│   ├── pipeline_test_v2.py                # v3 pipeline script (active)
+│   ├── run.py                             # Callable wrapper for background tasks
+│   ├── ocr.py                             # AWS Textract wrapper
+│   ├── nlp.py                             # AWS Comprehend Medical wrapper
+│   └── missing_info.py                    # Rule-based missing field detection
+│
+├── frontend/
+│   ├── app/
+│   │   ├── page.tsx                       # Queue view (auto-refreshes every 30s)
+│   │   └── referrals/[id]/page.tsx        # Referral detail view
+│   ├── components/
+│   │   ├── QueueCard.tsx
+│   │   ├── PriorityBadge.tsx
+│   │   ├── ActionButtons.tsx
+│   │   └── AutoRefresh.tsx
+│   └── lib/
+│       ├── api.ts                         # API client
+│       ├── types.ts                       # TypeScript types
+│       └── utils.ts                       # Formatting + color config
+│
+├── scripts/
+│   └── seed.py                            # Load de-identified test referrals into DB
+│
+├── classifier/
+│   ├── classifier.py                      # Core classifier
+│   ├── prompts.py                         # ENT + specialty prompts
+│   └── test_classifier.py                 # Pytest suite
+│
+├── evaluation/
+│   ├── score.py                           # Precision/recall/F1 evaluation
+│   └── results/                           # JSON metrics per eval run
+│
 ├── streamlit_demo/
-│   └── demo.py                        # Streamlit demo UI
-├── data/
-│   └── synthetic_referrals.json       # 20 synthetic ENT referrals for testing
-└── docs/
-    └── urgency_criteria.md            # ENT urgency criteria documentation
+│   └── demo.py                            # Interactive demo UI
+│
+└── referrals/
+    ├── Redacted_Referrals/                # 8 de-identified test referrals
+    └── Training_Redacted_Referrals/       # 7 training referrals (v3 evaluation set)
 ```
+
+---
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/referrals/ingest` | Accept new fax S3 key, kick off pipeline |
+| `GET` | `/referrals/` | Paginated queue sorted by priority tier |
+| `GET` | `/referrals/{id}` | Full referral detail |
+| `PATCH` | `/referrals/{id}/status` | Update status + write audit log |
+| `GET` | `/referrals/{id}/audit` | HIPAA audit trail |
+| `GET` | `/health` | Health check |
 
 ---
 
@@ -184,56 +262,52 @@ triageai/
 
 TriageAI is designed for HIPAA compliance from day one:
 
-- All PHI encrypted at rest using **AES-256**
-- All data in transit encrypted via **TLS 1.2+**
-- Fax ingestion via **HIPAA-compliant BAA partners** (Phaxio / Documo)
-- AWS services used under **AWS BAA coverage** (Textract, Comprehend Medical, RDS)
-- No PHI stored in logs
-- Role-based access control per clinic
-- Audit trail for all classification events
+- PHI encrypted at rest (**AES-256**) and in transit (**TLS 1.2+**)
+- AWS Bedrock used under **existing AWS BAA** — no separate agreement needed
+- **No PHI in logs** — structured logs contain only UUIDs, enums, and timing
+- **Append-only audit trail** with 6-year retention requirement
+- Role-based access control per clinic (Auth0/Cognito — planned)
+- Multi-clinic data isolation enforced at the query level
+- GPT-4o fallback is **not BAA-covered** — do not route real PHI through it
 
-> **Important:** TriageAI is an **administrative workflow tool**, not a clinical decision support system. The AI surfaces information and suggests a priority — the clinician makes all final decisions. Nothing in this system constitutes medical advice.
+> **Important:** TriageAI is an **administrative workflow tool**, not a clinical decision support system. The AI surfaces information — triage staff make all final decisions.
+
+See `CLAUDE.md` for full HIPAA rules and pre-production checklist.
 
 ---
 
-## Urgency Criteria (ENT)
+## Competitor Comparison
 
-See [`docs/urgency_criteria.md`](docs/urgency_criteria.md) for full criteria.
-
-**URGENT**
-- Confirmed cancer diagnoses
-- Suspicious or rapidly growing oral or neck lesions
-- Tongue ties in infants with feeding issues
-- Nasal fractures (narrow 1–2 week surgical window)
-
-**ROUTINE**
-- Non-growing oral lesions in random areas
-- Hearing loss in children (non-urgent)
-
-**NEEDS REVIEW**
-- Missing CT/MRI imaging
-- Missing labs
-- No clinical notes (authorization only)
-- No referring physician contact info
+| Feature | Tennr | **TriageAI** |
+|---------|-------|--------------|
+| Target customer | Large health systems | **1–10 provider specialty clinics** |
+| EHR integration required | Yes | **No — self-serve** |
+| Urgency triage | No | **Yes — core feature** |
+| Specialty-specific criteria | No | **Yes (ENT validated, others planned)** |
+| Missing info detection | Partial | **Yes — with callback prompts** |
+| Setup time | Weeks–months | **Days** |
+| Pricing | Enterprise contract | **$200–$350/provider/month** |
+| HIPAA compliant | Yes | **Yes** |
 
 ---
 
 ## Roadmap
 
-- [x] Core urgency classifier (Claude API)
+- [x] Core urgency classifier (Claude via Bedrock)
+- [x] Three-tier classification (Priority / Secondary / Standard)
+- [x] v3 pipeline validated on 6 de-identified ENT referrals
+- [x] PostgreSQL schema + Alembic migrations
+- [x] FastAPI backend (queue, detail, ingest, audit endpoints)
+- [x] Next.js frontend with live queue + referral detail
+- [x] Seed script with de-identified test data
 - [x] Streamlit demo
-- [x] Synthetic test data (ENT)
-- [x] Missing info detection
-- [ ] Phaxio fax ingestion integration
-- [ ] AWS Textract OCR pipeline
-- [ ] AWS Comprehend Medical NLP pipeline
-- [ ] FastAPI production backend
-- [ ] React + Tailwind frontend
-- [ ] PostgreSQL persistence
-- [ ] Auth0 authentication
+- [ ] Clinical validation — Nadia Rabia (SacENT)
+- [ ] Auth0 / AWS Cognito authentication
+- [ ] Phaxio fax ingestion + S3 Lambda trigger
+- [ ] AWS RDS production deployment
 - [ ] Cardiology specialty criteria
 - [ ] Orthopedics specialty criteria
-- [ ] Multi-clinic tenant isolation
+- [ ] Multi-clinic onboarding
 
 ---
 
