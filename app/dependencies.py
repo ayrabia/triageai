@@ -2,39 +2,46 @@
 FastAPI dependencies shared across routes.
 
 Auth (get_current_user):
-  Currently a placeholder — returns None for all requests.
-  Replace the body with real JWT verification (Auth0 / AWS Cognito) before
-  any PHI touches this service in production. The routes already accept the
-  dependency so the swap is a one-file change.
+  Verifies the Bearer token from the Authorization header against AWS Cognito,
+  then looks up the user by their Cognito subject ID (sub claim).
+  Returns a User with a verified clinic_id — all route-level clinic_id checks
+  must derive from this value, never from request parameters.
 
 DB (get_db):
   Re-exported here so routes only need to import from app.dependencies.
 """
 
-from typing import Optional
-from uuid import UUID
-
-from fastapi import Depends, Header
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from db.session import get_db  # noqa: F401 — re-exported for routes
+from app.auth import verify_token
 from db.models import User
+from db.session import get_db  # noqa: F401 — re-exported for routes
+
+_bearer = HTTPBearer()
 
 
 def get_current_user(
-    x_user_id: Optional[str] = Header(default=None),
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
     db: Session = Depends(get_db),
-) -> Optional[User]:
+) -> User:
     """
-    TODO: Replace with real JWT verification before production.
+    Verify the Bearer JWT from the Authorization header and return the
+    corresponding User row (which carries a verified clinic_id).
 
-    For local development only — accepts an X-User-Id header and looks up
-    the user in the DB. This is NOT secure and must not be used with real PHI.
+    Raises 401 if the token is missing, invalid, or expired.
+    Raises 403 if the token is valid but the user has not been provisioned
+    in TriageAI (e.g. Cognito account exists but no User row yet).
     """
-    if x_user_id is None:
-        return None
-    try:
-        uid = UUID(x_user_id)
-        return db.get(User, uid)
-    except (ValueError, Exception):
-        return None
+    claims = verify_token(credentials.credentials)
+    cognito_sub = claims.get("sub")
+
+    user = db.query(User).filter(User.auth_provider_id == cognito_sub).first()
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User not provisioned — contact your clinic administrator",
+        )
+
+    return user

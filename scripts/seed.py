@@ -38,8 +38,8 @@ REDACTED_PDF_DIR = Path(__file__).resolve().parents[1] / "referrals/Training_Red
 
 # Maps Claude's exact action string → ReferralAction enum
 ACTION_MAP = {
-    "FLAGGED FOR PRIORITY REVIEW": ReferralAction.PRIORITY_REVIEW,
-    "SECONDARY APPROVAL NEEDED": ReferralAction.SECONDARY_APPROVAL,
+    "PRIORITY REVIEW": ReferralAction.PRIORITY_REVIEW,
+    "SECONDARY APPROVAL": ReferralAction.SECONDARY_APPROVAL,
     "STANDARD QUEUE": ReferralAction.STANDARD_QUEUE,
 }
 

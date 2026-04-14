@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import PriorityBadge from './PriorityBadge'
-import { ACTION_CONFIG, STATUS_CONFIG, formatRelativeTime } from '@/lib/utils'
+import { ACTION_CONFIG, STATUS_CONFIG, formatDate, formatRelativeTime } from '@/lib/utils'
 import type { ReferralSummary } from '@/lib/types'
 
 interface Props {
@@ -12,21 +12,44 @@ export default function QueueCard({ referral }: Props) {
   const statusCfg = STATUS_CONFIG[referral.status]
   const missingCount = referral.missing_information?.length ?? 0
 
+  const isProcessing = referral.status === 'pending' && !referral.action
+  const isFailed = referral.status === 'failed'
+
   return (
     <Link href={`/referrals/${referral.id}`}>
       <div
         className={`
-          group relative flex flex-col gap-3 rounded-xl border border-slate-200 bg-white
+          group relative flex flex-col gap-3 rounded-xl border bg-white
           p-5 shadow-sm transition-all duration-150
-          border-l-4 ${cfg?.borderColor ?? 'border-l-slate-200'}
-          hover:shadow-md hover:border-slate-300 cursor-pointer
+          border-l-4 cursor-pointer
+          ${isFailed
+            ? 'border-red-200 border-l-red-400 hover:shadow-md hover:border-red-300'
+            : isProcessing
+            ? 'border-slate-200 border-l-slate-200 hover:shadow-md hover:border-slate-300'
+            : `border-slate-200 ${cfg?.borderColor ?? 'border-l-slate-200'} hover:shadow-md hover:border-slate-300`
+          }
         `}
       >
         {/* Top row */}
         <div className="flex items-center justify-between gap-3">
-          <PriorityBadge action={referral.action} />
+          {isProcessing ? (
+            <span className="flex items-center gap-2 text-xs font-medium text-slate-400">
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-500" />
+              Processing…
+            </span>
+          ) : isFailed ? (
+            <span className="flex items-center gap-1.5 rounded-full bg-red-100 px-2.5 py-1 text-xs font-semibold text-red-700">
+              <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+              </svg>
+              Pipeline failed
+            </span>
+          ) : (
+            <PriorityBadge action={referral.action} />
+          )}
+
           <div className="flex items-center gap-2">
-            {referral.status !== 'pending' && (
+            {referral.status !== 'pending' && referral.status !== 'failed' && (
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.color}`}>
                 {statusCfg.label}
               </span>
@@ -40,18 +63,26 @@ export default function QueueCard({ referral }: Props) {
               </span>
             )}
             <span className="text-xs text-slate-400">
+              {formatDate(referral.received_at)}
+              <span className="mx-1 text-slate-300">·</span>
               {formatRelativeTime(referral.received_at)}
             </span>
           </div>
         </div>
 
-        {/* Referral reason */}
-        <p className="line-clamp-2 text-sm font-medium leading-snug text-slate-800">
-          {referral.referral_reason ?? 'Processing…'}
-        </p>
+        {/* Referral reason / status text */}
+        {isFailed ? (
+          <p className="text-sm font-medium leading-snug text-red-700">
+            Classification failed — open to view details and retry
+          </p>
+        ) : (
+          <p className="line-clamp-2 text-sm font-medium leading-snug text-slate-800">
+            {referral.referral_reason ?? (isProcessing ? 'Extracting referral information…' : '—')}
+          </p>
+        )}
 
         {/* Summary */}
-        {referral.summary && (
+        {!isProcessing && !isFailed && referral.summary && (
           <p className="line-clamp-1 text-xs leading-relaxed text-slate-500">
             {referral.summary}
           </p>
@@ -59,7 +90,7 @@ export default function QueueCard({ referral }: Props) {
 
         {/* Bottom row */}
         <div className="flex items-center justify-between pt-1">
-          {referral.recommended_window ? (
+          {referral.recommended_window && !isProcessing && !isFailed ? (
             <span className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
               <svg className="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5" />

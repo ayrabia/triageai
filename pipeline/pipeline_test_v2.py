@@ -5,9 +5,9 @@ This script runs both AWS Textract and Claude Vision (via Bedrock)
 on a referral PDF stored in your S3 bucket.
 
 v2 UPDATE: Now uses three-tier classification:
-  1. FLAGGED FOR PRIORITY REVIEW — AI found matching urgent criteria
-  2. SECONDARY APPROVAL NEEDED — referring provider marked urgent but 
-     AI didn't find matching criteria. Triage team should double-check.
+  1. PRIORITY REVIEW — AI found matching urgent criteria
+  2. SECONDARY APPROVAL — referring provider marked urgent but
+     AI found no matching criteria. Triage team must double-check.
   3. STANDARD QUEUE — no urgent criteria matched, not marked urgent
 
 Usage:
@@ -27,32 +27,14 @@ import base64
 import os
 from pathlib import Path
 
+from classifier.criteria import ENT_URGENT_CRITERIA
+
 # ============================================================
 # CONFIGURATION
 # ============================================================
-S3_BUCKET = "triageai-test-referrals"
-AWS_REGION = "us-east-1"
-CLAUDE_MODEL_ID = "us.anthropic.claude-sonnet-4-6"
-
-# ============================================================
-# ENT URGENT CRITERIA — from Nadia's interview
-# ============================================================
-ENT_URGENT_CRITERIA = """
-Compare the referral against these ENT urgent criteria. Each criterion includes the
-recommended scheduling window to include in your output when that criterion is matched:
-
-- Confirmed or suspected cancer / malignancy → recommended window: 3-4 weeks
-- Rapidly growing neck or oral lesions → recommended window: 1-2 weeks
-- Nasal fractures — ONLY if injury occurred within the past 1-2 weeks (acute window).
-  If the fracture is older than 2 weeks, it is PAST the surgical window and does NOT
-  qualify as an urgent criterion. Do NOT flag delayed/chronic nasal fractures as Tier 1.
-  → recommended window (if within window): 1-2 weeks
-- Sudden hearing loss (acute onset, not gradual) → recommended window: within 1 week
-- Airway compromise or obstruction → recommended window: same day / next day
-- Tongue ties in infants with feeding issues → recommended window: 1-2 weeks
-- Peritonsillar abscess → recommended window: same day / next day
-- Foreign body in ear/nose/throat → recommended window: same day
-"""
+S3_BUCKET = os.environ.get("S3_BUCKET", "triageai-test-referrals")
+AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
+CLAUDE_MODEL_ID = os.environ.get("CLAUDE_MODEL_ID", "us.anthropic.claude-sonnet-4-6")
 
 # ============================================================
 # CLAUDE PROMPT v2 — Three-tier classification
@@ -103,37 +85,36 @@ For this referral, extract and organize the following information:
    
    Then, apply this THREE-TIER classification logic:
    
-   TIER 1 — "FLAGGED FOR PRIORITY REVIEW": 
-     The clinical content matches one or more urgent criteria, REGARDLESS of what 
-     the referring provider labeled it. (This catches urgent cases even if the 
+   TIER 1 — "PRIORITY REVIEW":
+     The clinical content matches one or more urgent criteria, REGARDLESS of what
+     the referring provider labeled it. (This catches urgent cases even if the
      provider marked it routine.)
-   
-   TIER 2 — "SECONDARY APPROVAL NEEDED":
-     The referring provider marked the referral as urgent/stat/priority, BUT the 
-     clinical content does NOT match any of the defined urgent criteria above. 
-     The triage team should review to determine if the provider knows something 
+
+   TIER 2 — "SECONDARY APPROVAL":
+     The referring provider marked the referral as urgent/stat/priority, BUT the
+     clinical content does NOT match any of the defined urgent criteria above.
+     The triage team should review to determine if the provider knows something
      not captured in the document, or if the urgency label is incorrect.
-   
+     NEVER silently downgrade a provider's urgent label.
+
    TIER 3 — "STANDARD QUEUE":
      No urgent criteria matched AND the referring provider did NOT mark it as urgent.
      This is a routine referral.
-   
+
    For each tier, output:
-   - action: the tier label
+   - action: the tier label exactly as written above
    - matched_criteria: [list which criteria matched, if any]
    - evidence: [exact text from the document that triggered each match]
-   - provider_label: what the referring provider marked (urgent/routine/none found)
-   - reasoning: one sentence explaining WHY this tier was assigned — specifically 
+   - provider_label: what the referring provider marked (urgent/routine/stat/none found)
+   - referring_clinic_classification: the urgency label exactly as written in the document, or null
+   - reasoning: one sentence explaining WHY this tier was assigned — specifically
      addressing whether the AI criteria and the provider label agree or disagree
 
    CRITICAL RULE: The "action" field in your JSON output MUST match your reasoning.
-   If your reasoning concludes that the referral should be SECONDARY APPROVAL NEEDED 
-   (because the provider marked it urgent but no clinical criteria matched), then the 
-   action field MUST say "SECONDARY APPROVAL NEEDED" — NOT "STANDARD QUEUE". 
-   STANDARD QUEUE is ONLY for cases where no criteria matched AND the provider did 
-   NOT mark it as urgent. If the provider marked it urgent and no criteria match, 
-   that is ALWAYS Tier 2 (SECONDARY APPROVAL NEEDED), never Tier 3 (STANDARD QUEUE).
-   Double-check your action field against your reasoning before outputting.
+   If your reasoning concludes SECONDARY APPROVAL (provider said urgent, no clinical
+   criteria matched), the action field MUST say "SECONDARY APPROVAL" — NOT "STANDARD QUEUE".
+   STANDARD QUEUE is ONLY for cases where no criteria matched AND the provider did
+   NOT mark it as urgent. Double-check your action field against your reasoning before outputting.
 
 7. SUMMARY: A 2-3 sentence plain-language summary that a referral coordinator
    could read to quickly understand this referral without reading the full document.
@@ -159,12 +140,13 @@ Output your response as structured JSON with these exact keys:
         "source": "where in the document this was found"
     }},
     "criteria_check": {{
-        "action": "FLAGGED FOR PRIORITY REVIEW" or "SECONDARY APPROVAL NEEDED" or "STANDARD QUEUE",
+        "action": "PRIORITY REVIEW" or "SECONDARY APPROVAL" or "STANDARD QUEUE",
         "matched_criteria": ["..."] or [],
         "evidence": ["..."] or [],
-        "provider_label": "...",
+        "provider_label": "urgent" or "routine" or "stat" or "elective" or "none found",
+        "referring_clinic_classification": "the urgency label exactly as written in the document, or null",
         "reasoning": "...",
-        "recommended_window": "the recommended scheduling window if Tier 1 (e.g. '3-4 weeks'), or null if Tier 2 or Tier 3"
+        "recommended_window": "the recommended scheduling window if PRIORITY REVIEW (e.g. '3-4 weeks'), or null"
     }},
     "next_steps": "Clinic-specific scheduling guidance. For Tier 1, state the recommended scheduling window based on the matched criterion. For Tier 2, describe what the triage team needs to verify before scheduling. For referrals requiring a hearing test, note that the patient should be scheduled for a hearing test first with the ENT appointment 15 minutes after. For Tier 3, standard scheduling applies.",
     "summary": "..."
@@ -255,7 +237,7 @@ def run_claude_vision(s3_key):
     print("Converting PDF pages to images...")
     try:
         from pdf2image import convert_from_path
-        images = convert_from_path(local_pdf, dpi=200, fmt="jpeg")
+        images = convert_from_path(local_pdf, dpi=100, fmt="jpeg")
         print(f"Converted {len(images)} pages to images")
     except Exception as e:
         print(f"ERROR converting PDF: {e}")
@@ -346,7 +328,7 @@ def save_results(s3_key, textract_text, claude_result):
         "claude_vision": claude_result
     }
     
-    output_dir = Path("pipeline_results/v3_redacted_final")
+    output_dir = Path("pipeline_results")
     output_dir.mkdir(exist_ok=True)
     
     filename = Path(s3_key).stem
@@ -428,8 +410,8 @@ def main():
     print(f"DONE — Full results saved to: {output_file}")
     print(f"{'=' * 60}")
     print("\nThree-tier classification logic:")
-    print("  TIER 1 - FLAGGED FOR PRIORITY REVIEW: Clinical criteria matched (regardless of provider label)")
-    print("  TIER 2 - SECONDARY APPROVAL NEEDED: Provider marked urgent but no criteria matched")
+    print("  TIER 1 - PRIORITY REVIEW: Clinical criteria matched (regardless of provider label)")
+    print("  TIER 2 - SECONDARY APPROVAL: Provider marked urgent but no criteria matched")
     print("  TIER 3 - STANDARD QUEUE: No criteria matched and not marked urgent")
 
 

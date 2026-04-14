@@ -3,6 +3,7 @@ import enum
 
 class ReferralStatus(str, enum.Enum):
     PENDING = "pending"
+    FAILED = "failed"       # pipeline error — needs manual review
     REVIEWED = "reviewed"
     APPROVED = "approved"
     ESCALATED = "escalated"
@@ -10,8 +11,8 @@ class ReferralStatus(str, enum.Enum):
 
 
 class ReferralAction(str, enum.Enum):
-    PRIORITY_REVIEW = "FLAGGED FOR PRIORITY REVIEW"
-    SECONDARY_APPROVAL = "SECONDARY APPROVAL NEEDED"
+    PRIORITY_REVIEW = "PRIORITY REVIEW"
+    SECONDARY_APPROVAL = "SECONDARY APPROVAL"
     STANDARD_QUEUE = "STANDARD QUEUE"
 
 

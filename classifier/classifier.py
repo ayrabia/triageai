@@ -2,7 +2,9 @@
 Core urgency classifier for TriageAI.
 
 Accepts raw referral text and returns a structured classification result.
-Uses Claude API (primary) with OpenAI as fallback.
+Uses Claude via AWS Bedrock exclusively — the only path covered by the AWS BAA.
+OpenAI fallback has been intentionally removed: it is not BAA-covered and
+must not receive real PHI.
 """
 
 import json
@@ -17,13 +19,19 @@ from classifier.prompts import get_prompt
 load_dotenv()
 
 CLAUDE_MODEL = "claude-sonnet-4-6"
-OPENAI_MODEL = "gpt-4o"
+
+# Valid classification tiers
+VALID_CLASSIFICATIONS = {"PRIORITY REVIEW", "SECONDARY APPROVAL", "STANDARD QUEUE", "INCOMPLETE"}
 
 
 @dataclass
 class ClassificationResult:
-    classification: str  # "URGENT" | "ROUTINE" | "NEEDS_REVIEW"
+    classification: str        # "PRIORITY REVIEW" | "SECONDARY APPROVAL" | "STANDARD QUEUE" | "INCOMPLETE"
     reason: str
+    provider_urgency_label: str  # what the referring provider marked (e.g. "urgent", "routine", "none found")
+    referring_clinic_classification: Optional[str]  # exact label as written in referral, or None
+    matched_criteria: list[str]
+    recommended_window: Optional[str]  # scheduling window for PRIORITY REVIEW, else None
     extracted_keywords: list[str]
     confidence: float
     missing_info: list[str]
@@ -34,6 +42,10 @@ class ClassificationResult:
         return {
             "classification": self.classification,
             "reason": self.reason,
+            "provider_urgency_label": self.provider_urgency_label,
+            "referring_clinic_classification": self.referring_clinic_classification,
+            "matched_criteria": self.matched_criteria,
+            "recommended_window": self.recommended_window,
             "extracted_keywords": self.extracted_keywords,
             "confidence": self.confidence,
             "missing_info": self.missing_info,
@@ -45,7 +57,6 @@ class ClassificationResult:
 def _parse_model_response(raw_text: str) -> dict:
     """Extract and parse JSON from model response text."""
     text = raw_text.strip()
-    # Strip markdown code fences if present
     if text.startswith("```"):
         lines = text.split("\n")
         text = "\n".join(
@@ -69,43 +80,29 @@ def _classify_with_claude(system_prompt: str, user_message: str) -> tuple[dict, 
     return _parse_model_response(raw), CLAUDE_MODEL
 
 
-def _classify_with_openai(system_prompt: str, user_message: str) -> tuple[dict, str]:
-    """Call the OpenAI API and return parsed result + model name."""
-    from openai import OpenAI
-
-    client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-    response = client.chat.completions.create(
-        model=OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ],
-        response_format={"type": "json_object"},
-        max_tokens=1024,
-    )
-    raw = response.choices[0].message.content
-    return _parse_model_response(raw), OPENAI_MODEL
-
-
 def classify_referral(
     referral_text: str,
     specialty: str = "ENT",
 ) -> ClassificationResult:
     """
-    Classify an incoming referral by urgency.
+    Classify an incoming referral.
 
     Args:
         referral_text: Raw text from the faxed referral document.
         specialty: Clinic specialty. Defaults to "ENT".
 
     Returns:
-        ClassificationResult with classification, reason, keywords, confidence,
-        missing_info, and the model used.
+        ClassificationResult with classification tier, provider label,
+        TriageAI's matched criteria, scheduling window, and supporting fields.
     """
     if not referral_text or not referral_text.strip():
         return ClassificationResult(
-            classification="NEEDS_REVIEW",
+            classification="INCOMPLETE",
             reason="Referral text is empty or blank.",
+            provider_urgency_label="none found",
+            referring_clinic_classification=None,
+            matched_criteria=[],
+            recommended_window=None,
             extracted_keywords=[],
             confidence=1.0,
             missing_info=["referral text"],
@@ -120,37 +117,39 @@ def classify_referral(
     model_used: str = ""
     last_error: str = ""
 
-    # Try Claude first
     if os.environ.get("ANTHROPIC_API_KEY"):
         try:
             result_dict, model_used = _classify_with_claude(system_prompt, user_message)
         except Exception as e:
             last_error = f"Claude error: {e}"
-            print(f"[TriageAI] Claude failed: {e}")  # visible in terminal
     else:
-        print("[TriageAI] ANTHROPIC_API_KEY not found in environment")
-
-    # Fallback to OpenAI
-    if not result_dict and os.environ.get("OPENAI_API_KEY"):
-        try:
-            result_dict, model_used = _classify_with_openai(system_prompt, user_message)
-            last_error = ""
-        except Exception as e:
-            last_error = f"OpenAI error: {e}"
+        last_error = "ANTHROPIC_API_KEY not set"
 
     if not result_dict:
         return ClassificationResult(
-            classification="NEEDS_REVIEW",
+            classification="INCOMPLETE",
             reason="Classification unavailable — API error. Please review manually.",
+            provider_urgency_label="none found",
+            referring_clinic_classification=None,
+            matched_criteria=[],
+            recommended_window=None,
             extracted_keywords=[],
             confidence=0.0,
             missing_info=[],
             error=last_error or "No API key configured.",
         )
 
+    # Normalise classification to a valid tier; fall back to INCOMPLETE if unexpected
+    raw_classification = result_dict.get("classification", "INCOMPLETE")
+    classification = raw_classification if raw_classification in VALID_CLASSIFICATIONS else "INCOMPLETE"
+
     return ClassificationResult(
-        classification=result_dict.get("classification", "NEEDS_REVIEW"),
+        classification=classification,
         reason=result_dict.get("reason", ""),
+        provider_urgency_label=result_dict.get("provider_urgency_label", "none found"),
+        referring_clinic_classification=result_dict.get("referring_clinic_classification"),
+        matched_criteria=result_dict.get("matched_criteria", []),
+        recommended_window=result_dict.get("recommended_window"),
         extracted_keywords=result_dict.get("extracted_keywords", []),
         confidence=float(result_dict.get("confidence", 0.0)),
         missing_info=result_dict.get("missing_info", []),

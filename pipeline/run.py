@@ -23,7 +23,7 @@ from uuid import UUID
 
 import boto3
 
-from db.enums import ReferralAction
+from db.enums import ReferralAction, ReferralStatus
 from db.models import AuditLog, Referral
 from db.session import SessionLocal
 
@@ -38,22 +38,17 @@ PIPELINE_VERSION = "v3"
 
 # Maps Claude's exact action string → ReferralAction enum
 _ACTION_MAP = {
-    "FLAGGED FOR PRIORITY REVIEW": ReferralAction.PRIORITY_REVIEW,
-    "SECONDARY APPROVAL NEEDED": ReferralAction.SECONDARY_APPROVAL,
+    "PRIORITY REVIEW": ReferralAction.PRIORITY_REVIEW,
+    "SECONDARY APPROVAL": ReferralAction.SECONDARY_APPROVAL,
     "STANDARD QUEUE": ReferralAction.STANDARD_QUEUE,
 }
 
 
-def _pdf_to_images(s3_key: str) -> list[dict]:
-    """Download PDF from S3, convert each page to a base64 JPEG content block."""
-    s3 = boto3.client("s3", region_name=AWS_REGION)
-    local_path = f"/tmp/{Path(s3_key).name}"
-    s3.download_file(S3_BUCKET, s3_key, local_path)
-
+def _pdf_to_images_from_path(local_path: str) -> list[dict]:
+    """Convert a local PDF to base64 JPEG content blocks for Claude."""
     from pdf2image import convert_from_path
 
     images = convert_from_path(local_path, dpi=200, fmt="jpeg")
-
     content = []
     for img in images:
         buf = BytesIO()
@@ -69,6 +64,14 @@ def _pdf_to_images(s3_key: str) -> list[dict]:
             }
         )
     return content
+
+
+def _pdf_to_images(s3_key: str) -> list[dict]:
+    """Download PDF from S3, then convert to base64 JPEG content blocks."""
+    s3 = boto3.client("s3", region_name=AWS_REGION)
+    local_path = f"/tmp/{Path(s3_key).name}"
+    s3.download_file(S3_BUCKET, s3_key, local_path)
+    return _pdf_to_images_from_path(local_path)
 
 
 def _call_claude(image_content: list[dict]) -> dict:
@@ -159,9 +162,82 @@ def process_referral(referral_id: UUID, s3_key: str) -> None:
         )
         db.commit()
 
-    except Exception:
+    except Exception as exc:
         db.rollback()
-        raise
+        # Mark the referral as failed so it surfaces in the UI
+        # instead of hanging in pending forever.
+        try:
+            referral = db.get(Referral, referral_id)
+            if referral:
+                referral.status = ReferralStatus.FAILED
+                db.add(AuditLog(
+                    referral_id=referral_id,
+                    user_id=None,
+                    action="pipeline_failed",
+                    new_value={"error": str(exc)[:500]},
+                ))
+                db.commit()
+        except Exception:
+            db.rollback()
+
+    finally:
+        db.close()
+
+
+def process_referral_from_bytes(referral_id: UUID, pdf_bytes: bytes) -> None:
+    """
+    Run the pipeline on raw PDF bytes (used for UI drag-and-drop uploads).
+
+    Saves the PDF to /tmp, then follows the same path as process_referral.
+    No S3 involved — suitable for local dev and early demos before fax ingestion
+    is wired up.
+    """
+    local_path = f"/tmp/{referral_id}.pdf"
+    Path(local_path).write_bytes(pdf_bytes)
+
+    db = SessionLocal()
+    try:
+        t0 = time.monotonic()
+        image_content = _pdf_to_images_from_path(local_path)
+        result = _call_claude(image_content)
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+
+        referral = db.get(Referral, referral_id)
+        if referral is None:
+            raise ValueError(f"Referral {referral_id} not found in DB")
+
+        _apply_result(referral, result, elapsed_ms)
+
+        db.add(
+            AuditLog(
+                referral_id=referral_id,
+                user_id=None,
+                action="pipeline_completed",
+                new_value={
+                    "pipeline_version": PIPELINE_VERSION,
+                    "action": referral.action.value if referral.action else None,
+                    "processing_time_ms": elapsed_ms,
+                    "source": "ui_upload",
+                },
+            )
+        )
+        db.commit()
+
+    except Exception as exc:
+        db.rollback()
+        try:
+            referral = db.get(Referral, referral_id)
+            if referral:
+                referral.status = ReferralStatus.FAILED
+                db.add(AuditLog(
+                    referral_id=referral_id,
+                    user_id=None,
+                    action="pipeline_failed",
+                    new_value={"error": str(exc)[:500], "source": "ui_upload"},
+                ))
+                db.commit()
+        except Exception:
+            db.rollback()
 
     finally:
         db.close()

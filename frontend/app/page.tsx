@@ -1,32 +1,70 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/auth'
 import { getQueue } from '@/lib/api'
 import QueueCard from '@/components/QueueCard'
-import AutoRefresh from '@/components/AutoRefresh'
-import type { ReferralAction, ReferralSummary } from '@/lib/types'
+import UploadZone from '@/components/UploadZone'
 import { ACTION_CONFIG } from '@/lib/utils'
+import type { ReferralAction, ReferralSummary } from '@/lib/types'
 
-const TIERS: ReferralAction[] = [
-  'FLAGGED FOR PRIORITY REVIEW',
-  'SECONDARY APPROVAL NEEDED',
-  'STANDARD QUEUE',
-]
+const TIERS: ReferralAction[] = ['PRIORITY REVIEW', 'SECONDARY APPROVAL', 'STANDARD QUEUE']
+const POLL_INTERVAL_MS = 30_000
 
 function countByTier(referrals: ReferralSummary[]) {
   return {
-    'FLAGGED FOR PRIORITY REVIEW': referrals.filter((r) => r.action === 'FLAGGED FOR PRIORITY REVIEW').length,
-    'SECONDARY APPROVAL NEEDED': referrals.filter((r) => r.action === 'SECONDARY APPROVAL NEEDED').length,
+    'PRIORITY REVIEW': referrals.filter((r) => r.action === 'PRIORITY REVIEW').length,
+    'SECONDARY APPROVAL': referrals.filter((r) => r.action === 'SECONDARY APPROVAL').length,
     'STANDARD QUEUE': referrals.filter((r) => r.action === 'STANDARD QUEUE').length,
     unprocessed: referrals.filter((r) => !r.action).length,
   }
 }
 
-export default async function QueuePage() {
-  let referrals: ReferralSummary[] = []
-  let fetchError = false
+export default function QueuePage() {
+  const { user, authLoading, logout } = useAuth()
+  const router = useRouter()
 
-  try {
-    referrals = await getQueue()
-  } catch {
-    fetchError = true
+  const [referrals, setReferrals] = useState<ReferralSummary[]>([])
+  const [fetchError, setFetchError] = useState(false)
+  const [pageLoading, setPageLoading] = useState(true)
+
+  const fetchQueue = useCallback(async () => {
+    if (!user) return
+    try {
+      const data = await getQueue(user.idToken)
+      setReferrals(data)
+      setFetchError(false)
+    } catch (err) {
+      if (err instanceof Error && err.message === 'UNAUTHORIZED') {
+        logout()
+        router.replace('/login')
+      } else {
+        setFetchError(true)
+      }
+    } finally {
+      setPageLoading(false)
+    }
+  }, [user, logout, router])
+
+  useEffect(() => {
+    if (authLoading) return
+    if (!user) {
+      router.replace('/login')
+      return
+    }
+    fetchQueue()
+    const interval = setInterval(fetchQueue, POLL_INTERVAL_MS)
+    return () => clearInterval(interval)
+  }, [authLoading, user, fetchQueue, router])
+
+  // Wait for auth to initialise before rendering anything
+  if (authLoading || pageLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+      </div>
+    )
   }
 
   const counts = countByTier(referrals)
@@ -34,7 +72,6 @@ export default async function QueuePage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <AutoRefresh />
       {/* Header */}
       <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
         <div className="mx-auto max-w-4xl px-6 py-4">
@@ -47,7 +84,8 @@ export default async function QueuePage() {
               </div>
               <div>
                 <h1 className="text-sm font-semibold text-slate-900">TriageAI</h1>
-                <p className="text-xs text-slate-400">Sacramento ENT</p>
+                {/* Clinic name loaded from auth — no hardcoding */}
+                <p className="text-xs text-slate-400">{user?.clinicName}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -58,6 +96,12 @@ export default async function QueuePage() {
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
                 {total} referral{total !== 1 ? 's' : ''}
               </span>
+              <button
+                onClick={() => { logout(); router.replace('/login') }}
+                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500 hover:bg-slate-200 transition-colors"
+              >
+                Sign out
+              </button>
             </div>
           </div>
         </div>
@@ -85,6 +129,11 @@ export default async function QueuePage() {
                   </div>
                 )
               })}
+            </div>
+
+            {/* Upload */}
+            <div className="mb-6">
+              <UploadZone token={user!.idToken} onUploaded={fetchQueue} />
             </div>
 
             {/* Queue */}

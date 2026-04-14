@@ -8,6 +8,7 @@ import type { ReferralStatus } from '@/lib/types'
 interface Props {
   referralId: string
   currentStatus: ReferralStatus
+  token: string
 }
 
 const ACTIONS: { status: ReferralStatus; label: string; style: string }[] = [
@@ -33,7 +34,7 @@ const ACTIONS: { status: ReferralStatus; label: string; style: string }[] = [
   },
 ]
 
-export default function ActionButtons({ referralId, currentStatus }: Props) {
+export default function ActionButtons({ referralId, currentStatus, token }: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState<ReferralStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -42,13 +43,22 @@ export default function ActionButtons({ referralId, currentStatus }: Props) {
     setLoading(status)
     setError(null)
     try {
-      await updateStatus(referralId, status)
+      await updateStatus(referralId, status, token)
       router.refresh()
     } catch {
       setError('Failed to update status. Please try again.')
     } finally {
       setLoading(null)
     }
+  }
+
+  // Failed referrals need pipeline retry, not a status action
+  if (currentStatus === 'failed') {
+    return (
+      <p className="text-xs text-red-600">
+        Pipeline failed — check the audit trail for the error, then re-upload the PDF.
+      </p>
+    )
   }
 
   const available = ACTIONS.filter((a) => a.status !== currentStatus)
