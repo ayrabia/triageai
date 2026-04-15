@@ -113,7 +113,7 @@ class Referral(Base):
     # One sentence: why this tier was assigned
     reasoning: Mapped[str | None] = mapped_column(Text, nullable=True)
     # e.g. "3-4 weeks" for Tier 1, null for Tier 2/3
-    recommended_window: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    recommended_window: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # --- Pipeline output: coordinator-facing fields ---
     next_steps: Mapped[str | None] = mapped_column(Text, nullable=True)

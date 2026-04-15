@@ -33,13 +33,15 @@ from db.enums import ReferralAction, ReferralStatus, UserRole
 from db.models import AuditLog, Clinic, Referral, User
 from db.session import SessionLocal
 
-V3_RESULTS_DIR = Path(__file__).resolve().parents[1] / "pipeline/pipeline_results/v3_notriage"
+V3_RESULTS_DIR = Path(__file__).resolve().parents[1] / "pipeline_results"
 REDACTED_PDF_DIR = Path(__file__).resolve().parents[1] / "referrals/Training_Redacted_Referrals"
 
 # Maps Claude's exact action string → ReferralAction enum
 ACTION_MAP = {
     "PRIORITY REVIEW": ReferralAction.PRIORITY_REVIEW,
+    "FLAGGED FOR PRIORITY REVIEW": ReferralAction.PRIORITY_REVIEW,
     "SECONDARY APPROVAL": ReferralAction.SECONDARY_APPROVAL,
+    "SECONDARY APPROVAL NEEDED": ReferralAction.SECONDARY_APPROVAL,
     "STANDARD QUEUE": ReferralAction.STANDARD_QUEUE,
 }
 

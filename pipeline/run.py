@@ -48,7 +48,7 @@ def _pdf_to_images_from_path(local_path: str) -> list[dict]:
     """Convert a local PDF to base64 JPEG content blocks for Claude."""
     from pdf2image import convert_from_path
 
-    images = convert_from_path(local_path, dpi=200, fmt="jpeg")
+    images = convert_from_path(local_path, dpi=150, fmt="jpeg")
     content = []
     for img in images:
         buf = BytesIO()
