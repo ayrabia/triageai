@@ -27,7 +27,7 @@ export default function TierQueue({ action }: Props) {
   const fetchReferrals = useCallback(async () => {
     if (!user) return
     try {
-      const data = await getQueue(user.idToken, action)
+      const data = await getQueue(user.idToken, { action })
       setReferrals(data)
       setFetchError(false)
     } catch (err) {

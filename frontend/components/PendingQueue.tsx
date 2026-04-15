@@ -35,8 +35,8 @@ export default function PendingQueue() {
     try {
       // Fetch pending (unclassified) + failed in one call each
       const [pending, failed] = await Promise.all([
-        getQueue(user.idToken, undefined, 'pending'),
-        getQueue(user.idToken, undefined, 'failed'),
+        getQueue(user.idToken, { status: 'pending' }),
+        getQueue(user.idToken, { status: 'failed' }),
       ])
       // pending includes both processing (no action) and classified-but-pending-review;
       // we only want the ones still in the pipeline (no action yet)

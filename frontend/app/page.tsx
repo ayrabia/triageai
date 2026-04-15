@@ -51,7 +51,7 @@ export default function HomePage() {
     if (!user) return
     try {
       const data = await getQueue(user.idToken)
-      setReferrals(data)
+      setReferrals(data.filter((r) => r.status !== 'archived'))
       setFetchError(false)
     } catch (err) {
       if (err instanceof Error && err.message === 'UNAUTHORIZED') {

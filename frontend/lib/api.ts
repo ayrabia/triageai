@@ -12,12 +12,11 @@ function authHeaders(token: string): HeadersInit {
 
 export async function getQueue(
   token: string,
-  action?: string,
-  status?: string,
+  opts: { action?: string; status?: string } = {},
 ): Promise<ReferralSummary[]> {
   const params = new URLSearchParams({ limit: '200' })
-  if (action) params.set('action', action)
-  if (status) params.set('status', status)
+  if (opts.action) params.set('action', opts.action)
+  if (opts.status) params.set('status', opts.status)
   const url = `${BASE}/referrals?${params.toString()}`
   const res = await fetch(url, {
     headers: authHeaders(token),
