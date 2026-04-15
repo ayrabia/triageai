@@ -26,6 +26,7 @@ COPY --from=builder /app/.next/static ./.next/static
 
 EXPOSE 3000
 ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
 
-CMD ["node", "server.js"]
+# App Runner overrides HOSTNAME with the container's actual hostname, which makes
+# Next.js bind to a specific IP instead of 0.0.0.0. Force it via the shell.
+CMD ["sh", "-c", "HOSTNAME=0.0.0.0 node server.js"]
