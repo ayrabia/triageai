@@ -10,10 +10,15 @@ function authHeaders(token: string): HeadersInit {
   }
 }
 
-export async function getQueue(token: string, action?: string): Promise<ReferralSummary[]> {
-  const url = action
-    ? `${BASE}/referrals?action=${encodeURIComponent(action)}&limit=200`
-    : `${BASE}/referrals?limit=200`
+export async function getQueue(
+  token: string,
+  action?: string,
+  status?: string,
+): Promise<ReferralSummary[]> {
+  const params = new URLSearchParams({ limit: '200' })
+  if (action) params.set('action', action)
+  if (status) params.set('status', status)
+  const url = `${BASE}/referrals?${params.toString()}`
   const res = await fetch(url, {
     headers: authHeaders(token),
     cache: 'no-store',

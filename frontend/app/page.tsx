@@ -171,25 +171,53 @@ export default function HomePage() {
             )
           })}
 
-          {/* Processing / failed status row */}
-          {(counts.processing > 0 || counts.failed > 0) && (
-            <div className="flex gap-3">
-              {counts.processing > 0 && (
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-500 shadow-sm">
-                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-500" />
-                  {counts.processing} processing
+          {/* In-pipeline card — always visible so staff can always track uploads */}
+          <Link href="/pending">
+            <div className={`
+              group flex items-center justify-between rounded-xl border border-slate-200
+              bg-white p-6 shadow-sm transition-all hover:shadow-md cursor-pointer
+              border-l-4
+              ${counts.failed > 0 ? 'border-l-red-400' : 'border-l-slate-300'}
+            `}>
+              <div className="flex items-center gap-4">
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${counts.failed > 0 ? 'bg-red-100' : 'bg-slate-100'}`}>
+                  {counts.failed > 0 ? (
+                    <svg className="h-5 w-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                    </svg>
+                  ) : (
+                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-500" />
+                  )}
                 </div>
-              )}
-              {counts.failed > 0 && (
-                <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-600 shadow-sm">
-                  <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                  </svg>
-                  {counts.failed} failed — open to retry
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold
+                      ${counts.failed > 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${counts.failed > 0 ? 'bg-red-400' : 'bg-slate-400 animate-pulse'}`} />
+                      In Pipeline
+                    </span>
+                    {counts.failed > 0 && (
+                      <span className="text-xs text-red-500 font-medium">{counts.failed} failed</span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {counts.processing > 0
+                      ? `${counts.processing} referral${counts.processing !== 1 ? 's' : ''} currently being classified`
+                      : 'No referrals currently processing'}
+                    {counts.failed > 0 ? ' — some need attention' : ''}
+                  </p>
                 </div>
-              )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-400 group-hover:text-slate-600 transition-colors">
+                  View
+                </span>
+                <svg className="h-4 w-4 text-slate-300 group-hover:text-slate-500 transition-colors" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+              </div>
             </div>
-          )}
+          </Link>
         </div>
       </main>
     </div>
