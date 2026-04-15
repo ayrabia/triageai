@@ -50,7 +50,7 @@ export default function TierQueue({ action }: Props) {
     return () => clearInterval(interval)
   }, [authLoading, user, fetchReferrals, router])
 
-  if (authLoading || loading) {
+  if (authLoading || loading || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
