@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Secrets
+.env
+.env.*
+
+# Large binary / data files
+referrals/
+pipeline_results/
+*.pdf
+*.jpg
+*.jpeg
+*.png
+
+# Frontend (separate image)
+frontend/
+
+# Dev / CI
+.git/
+.github/
+.claude/
+*.log
+.DS_Store
+
+# Tests
+.pytest_cache/
+htmlcov/
+
+# Notebooks
+*.ipynb
+.ipynb_checkpoints/
