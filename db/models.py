@@ -81,6 +81,8 @@ class Referral(Base):
     )
     # S3 key for the original fax PDF (AES-256 SSE enforced at bucket level)
     s3_key: Mapped[str] = mapped_column(String(1024), nullable=False)
+    # Original filename from the upload or fax system
+    filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     status: Mapped[ReferralStatus] = mapped_column(
         SAEnum(ReferralStatus, native_enum=False),

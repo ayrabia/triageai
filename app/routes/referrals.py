@@ -67,6 +67,7 @@ class ReferralSummary(BaseModel):
     clinic_id: UUID
     status: ReferralStatus
     action: Optional[ReferralAction]
+    filename: Optional[str]
     referral_reason: Optional[str]
     summary: Optional[str]
     recommended_window: Optional[str]
@@ -240,6 +241,7 @@ async def upload(
     db.flush()
 
     safe_name = (file.filename or "upload.pdf").replace("/", "_").replace("..", "")
+    referral.filename = safe_name
     db.add(
         AuditLog(
             referral_id=referral.id,

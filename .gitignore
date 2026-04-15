@@ -100,5 +100,8 @@ logs/
 frontend/.next/
 frontend/next-env.d.ts
 
+# Un-ignore frontend/lib (caught by Python lib/ pattern above)
+!frontend/lib/
+
 # Referral PDFs — large binary files, store in S3 not git
 referrals/**/*.pdf

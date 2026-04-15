@@ -10,8 +10,11 @@ function authHeaders(token: string): HeadersInit {
   }
 }
 
-export async function getQueue(token: string): Promise<ReferralSummary[]> {
-  const res = await fetch(`${BASE}/referrals`, {
+export async function getQueue(token: string, action?: string): Promise<ReferralSummary[]> {
+  const url = action
+    ? `${BASE}/referrals?action=${encodeURIComponent(action)}&limit=200`
+    : `${BASE}/referrals?limit=200`
+  const res = await fetch(url, {
     headers: authHeaders(token),
     cache: 'no-store',
   })

@@ -21,6 +21,7 @@ export interface ReferralSummary {
   clinic_id: string
   status: ReferralStatus
   action: ReferralAction | null
+  filename: string | null
   referral_reason: string | null
   summary: string | null
   recommended_window: string | null

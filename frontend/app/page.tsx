@@ -2,14 +2,13 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { getQueue } from '@/lib/api'
-import QueueCard from '@/components/QueueCard'
 import UploadZone from '@/components/UploadZone'
 import { ACTION_CONFIG } from '@/lib/utils'
-import type { ReferralAction, ReferralSummary } from '@/lib/types'
+import type { ReferralSummary } from '@/lib/types'
 
-const TIERS: ReferralAction[] = ['PRIORITY REVIEW', 'SECONDARY APPROVAL', 'STANDARD QUEUE']
 const POLL_INTERVAL_MS = 30_000
 
 function countByTier(referrals: ReferralSummary[]) {
@@ -17,17 +16,36 @@ function countByTier(referrals: ReferralSummary[]) {
     'PRIORITY REVIEW': referrals.filter((r) => r.action === 'PRIORITY REVIEW').length,
     'SECONDARY APPROVAL': referrals.filter((r) => r.action === 'SECONDARY APPROVAL').length,
     'STANDARD QUEUE': referrals.filter((r) => r.action === 'STANDARD QUEUE').length,
-    unprocessed: referrals.filter((r) => !r.action).length,
+    processing: referrals.filter((r) => r.status === 'pending' && !r.action).length,
+    failed: referrals.filter((r) => r.status === 'failed').length,
   }
 }
 
-export default function QueuePage() {
+const TIERS = [
+  {
+    action: 'PRIORITY REVIEW' as const,
+    href: '/priority',
+    description: 'Matches ENT urgent criteria — schedule immediately',
+  },
+  {
+    action: 'SECONDARY APPROVAL' as const,
+    href: '/secondary',
+    description: 'Provider marked urgent but no criteria matched — review before scheduling',
+  },
+  {
+    action: 'STANDARD QUEUE' as const,
+    href: '/standard',
+    description: 'No urgency indicated by provider or clinical content',
+  },
+]
+
+export default function HomePage() {
   const { user, authLoading, logout } = useAuth()
   const router = useRouter()
 
   const [referrals, setReferrals] = useState<ReferralSummary[]>([])
-  const [fetchError, setFetchError] = useState(false)
   const [pageLoading, setPageLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(false)
 
   const fetchQueue = useCallback(async () => {
     if (!user) return
@@ -49,16 +67,12 @@ export default function QueuePage() {
 
   useEffect(() => {
     if (authLoading) return
-    if (!user) {
-      router.replace('/login')
-      return
-    }
+    if (!user) { router.replace('/login'); return }
     fetchQueue()
     const interval = setInterval(fetchQueue, POLL_INTERVAL_MS)
     return () => clearInterval(interval)
   }, [authLoading, user, fetchQueue, router])
 
-  // Wait for auth to initialise before rendering anything
   if (authLoading || pageLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
@@ -84,7 +98,6 @@ export default function QueuePage() {
               </div>
               <div>
                 <h1 className="text-sm font-semibold text-slate-900">TriageAI</h1>
-                {/* Clinic name loaded from auth — no hardcoding */}
                 <p className="text-xs text-slate-400">{user?.clinicName}</p>
               </div>
             </div>
@@ -108,48 +121,76 @@ export default function QueuePage() {
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-8">
-        {fetchError ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+        {fetchError && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-center">
             <p className="text-sm font-medium text-red-700">Could not connect to the API.</p>
-            <p className="mt-1 text-xs text-red-500">Make sure the FastAPI server is running on port 8000.</p>
           </div>
-        ) : (
-          <>
-            {/* Tier summary stats */}
-            <div className="mb-8 grid grid-cols-3 gap-3">
-              {TIERS.map((tier) => {
-                const cfg = ACTION_CONFIG[tier]
-                return (
-                  <div key={tier} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-center gap-2">
-                      <span className={`h-2.5 w-2.5 rounded-full ${cfg.dotColor}`} />
-                      <span className="text-xs font-medium text-slate-500">{cfg.shortLabel}</span>
-                    </div>
-                    <p className="mt-2 text-2xl font-bold text-slate-900">{counts[tier]}</p>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Upload */}
-            <div className="mb-6">
-              <UploadZone token={user!.idToken} onUploaded={fetchQueue} />
-            </div>
-
-            {/* Queue */}
-            {referrals.length === 0 ? (
-              <div className="py-20 text-center">
-                <p className="text-sm text-slate-400">No referrals in the queue.</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {referrals.map((referral) => (
-                  <QueueCard key={referral.id} referral={referral} />
-                ))}
-              </div>
-            )}
-          </>
         )}
+
+        {/* Upload zone */}
+        <div className="mb-8">
+          <UploadZone token={user!.idToken} onUploaded={fetchQueue} />
+        </div>
+
+        {/* Tier cards */}
+        <div className="flex flex-col gap-4">
+          {TIERS.map(({ action, href, description }) => {
+            const cfg = ACTION_CONFIG[action]
+            const count = counts[action]
+            return (
+              <Link key={action} href={href}>
+                <div className={`
+                  group flex items-center justify-between rounded-xl border border-slate-200
+                  bg-white p-6 shadow-sm transition-all hover:shadow-md cursor-pointer
+                  border-l-4 ${cfg.borderColor}
+                `}>
+                  <div className="flex items-center gap-4">
+                    <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${cfg.badgeBg}`}>
+                      <span className="text-xl font-bold text-white">{count}</span>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1.5 rounded-full ${cfg.badgeBg} ${cfg.badgeText} px-2.5 py-0.5 text-xs font-semibold`}>
+                          <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
+                          {cfg.label}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">{description}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-400 group-hover:text-slate-600 transition-colors">
+                      Open queue
+                    </span>
+                    <svg className="h-4 w-4 text-slate-300 group-hover:text-slate-500 transition-colors" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                    </svg>
+                  </div>
+                </div>
+              </Link>
+            )
+          })}
+
+          {/* Processing / failed status row */}
+          {(counts.processing > 0 || counts.failed > 0) && (
+            <div className="flex gap-3">
+              {counts.processing > 0 && (
+                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-500 shadow-sm">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-500" />
+                  {counts.processing} processing
+                </div>
+              )}
+              {counts.failed > 0 && (
+                <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-600 shadow-sm">
+                  <svg className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                  </svg>
+                  {counts.failed} failed — open to retry
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </main>
     </div>
   )
