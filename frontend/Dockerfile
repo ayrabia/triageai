@@ -6,9 +6,14 @@ RUN npm ci
 
 COPY . .
 
-# API_URL is the internal App Runner backend URL — injected at build time
+# Build-time env vars (NEXT_PUBLIC_* are baked into the bundle, not read at runtime)
 ARG API_URL
+ARG NEXT_PUBLIC_COGNITO_REGION=us-east-1
+ARG NEXT_PUBLIC_COGNITO_APP_CLIENT_ID
+
 ENV API_URL=${API_URL}
+ENV NEXT_PUBLIC_COGNITO_REGION=${NEXT_PUBLIC_COGNITO_REGION}
+ENV NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=${NEXT_PUBLIC_COGNITO_APP_CLIENT_ID}
 
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
