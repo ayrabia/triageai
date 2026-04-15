@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
-import { getQueue } from '@/lib/api'
+import { getQueue, updateStatus } from '@/lib/api'
 import { formatDate, formatRelativeTime } from '@/lib/utils'
 import type { ReferralSummary } from '@/lib/types'
 
@@ -17,6 +17,18 @@ export default function PendingQueue() {
   const [referrals, setReferrals] = useState<ReferralSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [fetchError, setFetchError] = useState(false)
+  const [dismissing, setDismissing] = useState<Set<string>>(new Set())
+
+  const dismiss = useCallback(async (id: string) => {
+    if (!user) return
+    setDismissing((prev) => new Set(prev).add(id))
+    try {
+      await updateStatus(id, 'archived', user.idToken)
+      setReferrals((prev) => prev.filter((r) => r.id !== id))
+    } finally {
+      setDismissing((prev) => { const s = new Set(prev); s.delete(id); return s })
+    }
+  }, [user])
 
   const fetchReferrals = useCallback(async () => {
     if (!user) return
@@ -135,7 +147,12 @@ export default function PendingQueue() {
                 </h2>
                 <div className="flex flex-col gap-3">
                   {failed.map((r) => (
-                    <PendingCard key={r.id} referral={r} />
+                    <PendingCard
+                      key={r.id}
+                      referral={r}
+                      onDismiss={() => dismiss(r.id)}
+                      dismissing={dismissing.has(r.id)}
+                    />
                   ))}
                 </div>
               </section>
@@ -147,52 +164,69 @@ export default function PendingQueue() {
   )
 }
 
-function PendingCard({ referral }: { referral: ReferralSummary }) {
+function PendingCard({
+  referral,
+  onDismiss,
+  dismissing,
+}: {
+  referral: ReferralSummary
+  onDismiss?: () => void
+  dismissing?: boolean
+}) {
   const isFailed = referral.status === 'failed'
   const displayName = referral.filename ?? referral.id.slice(0, 8).toUpperCase()
 
   return (
-    <Link href={`/referrals/${referral.id}`}>
-      <div className={`
-        group flex items-center justify-between rounded-xl border bg-white p-5
-        shadow-sm transition-all hover:shadow-md cursor-pointer border-l-4
-        ${isFailed ? 'border-slate-200 border-l-red-400' : 'border-slate-200 border-l-slate-300'}
-      `}>
-        <div className="flex items-center gap-3 min-w-0">
-          {isFailed ? (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100">
-              <svg className="h-4 w-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-              </svg>
-            </div>
-          ) : (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-            </div>
-          )}
-          <div className="min-w-0">
-            <span className="block truncate text-sm font-medium text-slate-800 font-mono">
-              {displayName}
-            </span>
-            <span className="text-xs text-slate-400">
-              {isFailed ? 'Pipeline failed — open to view details' : 'Extracting and classifying…'}
-            </span>
+    <div className={`
+      flex items-center justify-between rounded-xl border bg-white p-5
+      shadow-sm border-l-4
+      ${isFailed ? 'border-slate-200 border-l-red-400' : 'border-slate-200 border-l-slate-300'}
+    `}>
+      <Link href={`/referrals/${referral.id}`} className="group flex items-center gap-3 min-w-0 flex-1">
+        {isFailed ? (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100">
+            <svg className="h-4 w-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+            </svg>
           </div>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="text-xs text-slate-400">
-            {formatDate(referral.received_at)}
-            <span className="mx-1 text-slate-300">·</span>
-            {formatRelativeTime(referral.received_at)}
+        ) : (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+          </div>
+        )}
+        <div className="min-w-0">
+          <span className="block truncate text-sm font-medium text-slate-800 font-mono group-hover:text-indigo-600 transition-colors">
+            {displayName}
           </span>
-          <svg
-            className="h-4 w-4 text-slate-300 transition-colors group-hover:text-slate-500"
-            fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-          </svg>
+          <span className="text-xs text-slate-400">
+            {isFailed ? 'Pipeline failed — open to view details' : 'Extracting and classifying…'}
+          </span>
         </div>
+      </Link>
+
+      <div className="flex items-center gap-3 shrink-0 ml-4">
+        <span className="text-xs text-slate-400">
+          {formatDate(referral.received_at)}
+          <span className="mx-1 text-slate-300">·</span>
+          {formatRelativeTime(referral.received_at)}
+        </span>
+        {isFailed && onDismiss && (
+          <button
+            onClick={onDismiss}
+            disabled={dismissing}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {dismissing ? (
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-500" />
+            ) : (
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+            Dismiss
+          </button>
+        )}
       </div>
-    </Link>
+    </div>
   )
 }
