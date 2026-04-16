@@ -39,7 +39,7 @@ export default function LoginPage() {
 
         {/* Logo + tagline */}
         <div className="mb-8 text-center">
-          <img src="/logo.png" alt="TriageAI" className="mx-auto mb-4 h-10 w-auto" />
+          <span className="block text-3xl font-black uppercase tracking-tighter text-primary mb-2">TriageAI</span>
           <p className="text-sm text-on-surface-variant leading-relaxed">Sign in to your clinic portal</p>
         </div>
 
