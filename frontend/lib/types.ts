@@ -10,6 +10,13 @@ export type ReferralStatus =
   | 'approved'
   | 'escalated'
   | 'archived'
+  | 'routed'
+
+export interface Physician {
+  id: string
+  name: string
+  email: string
+}
 
 export interface ProviderUrgencyLabel {
   label: string
@@ -28,6 +35,7 @@ export interface ReferralSummary {
   missing_information: string[] | null
   received_at: string
   processed_at: string | null
+  routed_to: string | null
 }
 
 export interface ReferralDetail {
@@ -56,6 +64,8 @@ export interface ReferralDetail {
   processed_at: string | null
   reviewed_at: string | null
   reviewed_by: string | null
+  routed_to: string | null
+  routed_at: string | null
   created_at: string
 }
 

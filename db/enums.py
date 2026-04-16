@@ -8,6 +8,7 @@ class ReferralStatus(str, enum.Enum):
     APPROVED = "approved"
     ESCALATED = "escalated"
     ARCHIVED = "archived"
+    ROUTED = "routed"       # routed to a physician by a coordinator
 
 
 class ReferralAction(str, enum.Enum):
@@ -20,3 +21,4 @@ class UserRole(str, enum.Enum):
     ADMIN = "admin"
     COORDINATOR = "coordinator"
     REVIEWER = "reviewer"
+    PHYSICIAN = "physician"

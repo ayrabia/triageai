@@ -25,7 +25,7 @@ from sqlalchemy import asc, case
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_user, get_db
-from db.enums import ReferralAction, ReferralStatus
+from db.enums import ReferralAction, ReferralStatus, UserRole
 from db.models import AuditLog, Referral, User
 from pipeline.run import process_referral, process_referral_from_bytes
 
@@ -74,6 +74,7 @@ class ReferralSummary(BaseModel):
     missing_information: Optional[list]
     received_at: datetime
     processed_at: Optional[datetime]
+    routed_to: Optional[UUID]
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -115,6 +116,8 @@ class ReferralDetail(BaseModel):
     processed_at: Optional[datetime]
     reviewed_at: Optional[datetime]
     reviewed_by: Optional[UUID]
+    routed_to: Optional[UUID]
+    routed_at: Optional[datetime]
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -122,6 +125,10 @@ class ReferralDetail(BaseModel):
 
 class StatusUpdate(BaseModel):
     status: ReferralStatus
+
+
+class RouteRequest(BaseModel):
+    physician_id: UUID
 
 
 class AuditEntry(BaseModel):
@@ -265,6 +272,7 @@ async def upload(
 def get_queue(
     status: Optional[ReferralStatus] = Query(default=None),
     action: Optional[ReferralAction] = Query(default=None),
+    assigned_to_me: bool = Query(default=False),
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
@@ -276,6 +284,8 @@ def get_queue(
 
     clinic_id is derived from the authenticated user — callers cannot
     request another clinic's queue.
+
+    assigned_to_me=true: physicians use this to see only their routed cases.
     """
     query = db.query(Referral).filter(Referral.clinic_id == current_user.clinic_id)
 
@@ -283,6 +293,8 @@ def get_queue(
         query = query.filter(Referral.status == status)
     if action is not None:
         query = query.filter(Referral.action == action)
+    if assigned_to_me:
+        query = query.filter(Referral.routed_to == current_user.id)
 
     return (
         query
@@ -343,6 +355,51 @@ def update_status(
             action="status_changed",
             old_value={"status": old_status.value},
             new_value={"status": body.status.value},
+        )
+    )
+    db.commit()
+    db.refresh(referral)
+    return referral
+
+
+@router.post("/{referral_id}/route", response_model=ReferralDetail)
+def route_referral(
+    referral_id: UUID,
+    body: RouteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Route a referral to a physician. Only coordinators and admins can route.
+    Sets status to ROUTED and records who it was sent to.
+    """
+    if current_user.role not in (UserRole.COORDINATOR, UserRole.ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only coordinators and admins can route referrals",
+        )
+
+    referral = _get_referral_or_404(referral_id, db)
+    _assert_clinic_access(referral, current_user)
+
+    physician = db.get(User, body.physician_id)
+    if not physician or physician.clinic_id != current_user.clinic_id:
+        raise HTTPException(status_code=404, detail="Physician not found")
+    if physician.role != UserRole.PHYSICIAN:
+        raise HTTPException(status_code=400, detail="Target user is not a physician")
+
+    old_status = referral.status
+    referral.status = ReferralStatus.ROUTED
+    referral.routed_to = body.physician_id
+    referral.routed_at = datetime.now(timezone.utc)
+
+    db.add(
+        AuditLog(
+            referral_id=referral_id,
+            user_id=current_user.id,
+            action="routed",
+            old_value={"status": old_status.value},
+            new_value={"status": ReferralStatus.ROUTED.value, "physician_id": str(body.physician_id)},
         )
     )
     db.commit()

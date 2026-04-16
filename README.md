@@ -48,8 +48,9 @@ TriageAI ingests faxed referrals, extracts clinical information using Claude via
 ## Current Status (April 2026)
 
 - **POC validated** on 6 real de-identified ENT referrals from Sacramento ENT — 0 missed urgents, 0 silent downgrades
-- **Backend complete** — FastAPI + PostgreSQL with full queue, detail, upload, status update, and audit trail endpoints
-- **Frontend complete** — Next.js multi-page queue (Priority / Secondary / Standard / In Pipeline) with per-tier views, urgency badges, filename display, and 30s auto-refresh
+- **Backend complete** — FastAPI + PostgreSQL with full queue, detail, upload, status update, audit trail, and physician routing endpoints
+- **Frontend complete** — Next.js multi-page queue (Priority / Secondary / Standard / In Pipeline) with per-tier views, urgency badges, filename display, 30s auto-refresh, and role-based UI
+- **Physician routing** — coordinators route referrals to physicians via a modal picker; physicians have a dedicated My Queue + All Cases view
 - **Auth live** — AWS Cognito (JWT, USER_PASSWORD_AUTH flow)
 - **Fully deployed on AWS** — App Runner (frontend + backend), RDS, S3, Bedrock, Cognito
 - **Awaiting clinical validation** from Nadia Rabia (Referral Coordinator, SacENT)
@@ -261,11 +262,13 @@ triageai/
 │   ├── .dockerignore
 │   ├── next.config.mjs                    # Standalone output + /api proxy
 │   ├── app/
-│   │   ├── page.tsx                       # Home dashboard — tier nav cards
+│   │   ├── page.tsx                       # Home dashboard — role-aware (coordinator vs physician)
 │   │   ├── priority/page.tsx              # Priority Review queue
 │   │   ├── secondary/page.tsx             # Secondary Approval queue
 │   │   ├── standard/page.tsx              # Standard Queue
 │   │   ├── pending/page.tsx               # In-pipeline / failed referrals
+│   │   ├── my-queue/page.tsx              # Physician: referrals assigned to them
+│   │   ├── all-cases/page.tsx             # Physician: all clinic referrals
 │   │   ├── referrals/[id]/page.tsx        # Referral detail + PDF viewer
 │   │   ├── login/page.tsx                 # Cognito login
 │   │   └── api/                           # Next.js route handlers (Cognito proxy)
@@ -273,6 +276,8 @@ triageai/
 │   │   ├── TierQueue.tsx                  # Shared tier page component
 │   │   ├── PendingQueue.tsx               # In-pipeline queue component
 │   │   ├── QueueCard.tsx                  # Referral card (badge-first)
+│   │   ├── RouteModal.tsx                 # Physician picker modal (coordinator use)
+│   │   ├── ActionButtons.tsx              # Role-aware triage action buttons
 │   │   ├── UploadZone.tsx                 # Drag-and-drop PDF upload
 │   │   └── PriorityBadge.tsx
 │   └── lib/
@@ -308,10 +313,15 @@ triageai/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/referrals/ingest` | Accept new fax S3 key, kick off pipeline |
-| `GET` | `/referrals/` | Paginated queue sorted by priority tier |
+| `POST` | `/referrals/upload` | Direct PDF upload from UI |
+| `GET` | `/referrals/` | Paginated queue sorted by priority tier (`assigned_to_me=true` for physician queue) |
 | `GET` | `/referrals/{id}` | Full referral detail |
 | `PATCH` | `/referrals/{id}/status` | Update status + write audit log |
+| `POST` | `/referrals/{id}/route` | Route to a physician (COORDINATOR/ADMIN only) |
 | `GET` | `/referrals/{id}/audit` | HIPAA audit trail |
+| `GET` | `/referrals/{id}/pdf` | Short-lived presigned S3 URL for the PDF |
+| `GET` | `/users/me` | Authenticated user profile + clinic info |
+| `GET` | `/users/physicians` | List physicians at the caller's clinic |
 | `GET` | `/health` | Health check |
 
 ---
@@ -363,7 +373,9 @@ See `CLAUDE.md` for full HIPAA rules and pre-production checklist.
 - [x] Fully deployed on AWS App Runner (frontend + backend, no Vercel/Railway)
 - [x] Seed script with de-identified test data
 - [x] Streamlit demo
+- [x] Physician role + referral routing workflow (coordinator routes → physician reviews)
 - [ ] Clinical validation — Nadia Rabia (SacENT)
+- [ ] Provision first physician account for end-to-end routing test
 - [ ] Phaxio fax ingestion + S3 Lambda trigger
 - [ ] Cardiology specialty criteria
 - [ ] Orthopedics specialty criteria

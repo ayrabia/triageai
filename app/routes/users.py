@@ -6,10 +6,11 @@ user's profile and clinic info after login.
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_user, get_db
+from db.enums import UserRole
 from db.models import Clinic, User
 
 router = APIRouter()
@@ -23,6 +24,31 @@ class MeResponse(BaseModel):
     clinic_id: UUID
     clinic_name: str
     clinic_specialty: str
+
+
+class PhysicianItem(BaseModel):
+    id: UUID
+    name: str
+    email: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+@router.get("/physicians", response_model=list[PhysicianItem])
+def get_physicians(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Return all physicians provisioned at the caller's clinic.
+    Used by the route modal to populate the physician picker.
+    """
+    return (
+        db.query(User)
+        .filter(User.clinic_id == current_user.clinic_id, User.role == UserRole.PHYSICIAN)
+        .order_by(User.name)
+        .all()
+    )
 
 
 @router.get("/me", response_model=MeResponse)

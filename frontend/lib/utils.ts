@@ -68,4 +68,5 @@ export const STATUS_CONFIG: Record<ReferralStatus, { label: string; color: strin
   approved:  { label: 'Approved',  color: 'text-on-primary bg-primary-container' },
   escalated: { label: 'Escalated', color: 'text-on-tertiary bg-tertiary-container' },
   archived:  { label: 'Archived',  color: 'text-outline bg-surface-container-high' },
+  routed:    { label: 'Routed',    color: 'text-primary bg-primary-fixed/30' },
 }

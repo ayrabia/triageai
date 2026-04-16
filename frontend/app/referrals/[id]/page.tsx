@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth'
 import { getReferral, getPdfUrl } from '@/lib/api'
 import PriorityBadge from '@/components/PriorityBadge'
 import ActionButtons from '@/components/ActionButtons'
+import RouteModal from '@/components/RouteModal'
 import { ACTION_CONFIG, STATUS_CONFIG, formatDateTime, formatRelativeTime } from '@/lib/utils'
 import type { ReferralDetail } from '@/lib/types'
 
@@ -25,6 +26,7 @@ export default function ReferralDetailPage({ params }: Props) {
   const [pdfOpen, setPdfOpen] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
+  const [routeModalOpen, setRouteModalOpen] = useState(false)
 
   useEffect(() => {
     if (authLoading) return
@@ -81,6 +83,14 @@ export default function ReferralDetailPage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-surface">
+
+      <RouteModal
+        referralId={referral.id}
+        token={user!.idToken}
+        isOpen={routeModalOpen}
+        onClose={() => setRouteModalOpen(false)}
+        onRouted={() => router.refresh()}
+      />
 
       {/* Header */}
       <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur-md shadow-header">
@@ -287,6 +297,8 @@ export default function ReferralDetailPage({ params }: Props) {
                 referralId={referral.id}
                 currentStatus={referral.status}
                 token={user!.idToken}
+                userRole={user!.role}
+                onRouteClick={() => setRouteModalOpen(true)}
               />
             </section>
           </div>

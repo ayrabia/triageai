@@ -1,4 +1,4 @@
-import type { ReferralDetail, ReferralStatus, ReferralSummary } from './types'
+import type { Physician, ReferralDetail, ReferralStatus, ReferralSummary } from './types'
 
 // All calls go through the Next.js proxy (/api/* → FastAPI)
 const BASE = '/api'
@@ -12,11 +12,12 @@ function authHeaders(token: string): HeadersInit {
 
 export async function getQueue(
   token: string,
-  opts: { action?: string; status?: string } = {},
+  opts: { action?: string; status?: string; assignedToMe?: boolean } = {},
 ): Promise<ReferralSummary[]> {
   const params = new URLSearchParams({ limit: '200' })
   if (opts.action) params.set('action', opts.action)
   if (opts.status) params.set('status', opts.status)
+  if (opts.assignedToMe) params.set('assigned_to_me', 'true')
   const url = `${BASE}/referrals?${params.toString()}`
   const res = await fetch(url, {
     headers: authHeaders(token),
@@ -80,5 +81,31 @@ export async function updateStatus(
   })
   if (res.status === 401) throw new Error('UNAUTHORIZED')
   if (!res.ok) throw new Error(`Failed to update status: ${res.status}`)
+  return res.json()
+}
+
+export async function getPhysicians(token: string): Promise<Physician[]> {
+  const res = await fetch(`${BASE}/users/physicians`, {
+    headers: authHeaders(token),
+    cache: 'no-store',
+  })
+  if (res.status === 401) throw new Error('UNAUTHORIZED')
+  if (!res.ok) throw new Error(`Failed to fetch physicians: ${res.status}`)
+  return res.json()
+}
+
+export async function routeReferral(
+  id: string,
+  physicianId: string,
+  token: string,
+): Promise<ReferralDetail> {
+  const res = await fetch(`${BASE}/referrals/${id}/route`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify({ physician_id: physicianId }),
+  })
+  if (res.status === 401) throw new Error('UNAUTHORIZED')
+  if (res.status === 403) throw new Error('FORBIDDEN')
+  if (!res.ok) throw new Error(`Failed to route referral: ${res.status}`)
   return res.json()
 }
