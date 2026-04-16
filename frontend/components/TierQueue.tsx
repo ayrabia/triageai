@@ -52,63 +52,53 @@ export default function TierQueue({ action }: Props) {
 
   if (authLoading || loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <span className="material-symbols-outlined text-primary animate-spin" style={{ fontSize: '32px' }}>sync</span>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto max-w-4xl px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/"
-                className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                </svg>
-                Home
-              </Link>
-              <span className="text-slate-200">/</span>
-              <span className={`inline-flex items-center gap-1.5 rounded-full ${cfg.badgeBg} ${cfg.badgeText} px-3 py-1 text-xs font-semibold`}>
-                <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
-                {cfg.label}
-              </span>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1.5 text-xs text-slate-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-                Live
-              </span>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
-                {referrals.length} referral{referrals.length !== 1 ? 's' : ''}
-              </span>
-            </div>
+    <div className="min-h-screen bg-surface">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur-md shadow-header">
+        <div className="mx-auto max-w-4xl px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 text-sm font-medium text-on-surface-variant hover:text-primary transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
+              Home
+            </Link>
+            <span className="h-5 w-px bg-outline-variant/40" />
+            <h1 className="text-lg font-bold tracking-tight text-primary">{cfg.label}</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-bold tracking-wide uppercase ${cfg.badgeBg} ${cfg.badgeText}`}>
+              <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${cfg.dotColor === cfg.badgeBg ? 'bg-white/60' : cfg.dotColor}`} />
+              Live
+            </span>
+            <span className="text-sm font-medium text-on-surface-variant">
+              {referrals.length} referral{referrals.length !== 1 ? 's' : ''}
+            </span>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-8">
         {fetchError ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-            <p className="text-sm font-medium text-red-700">Could not load referrals.</p>
+          <div className="rounded-lg border border-error/20 bg-error-container/20 p-6 text-center">
+            <p className="text-sm font-medium text-error">Could not load referrals.</p>
           </div>
         ) : referrals.length === 0 ? (
-          <div className="py-24 text-center">
-            <div className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full ${cfg.badgeBg}`}>
-              <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-            </div>
-            <p className="text-sm font-medium text-slate-600">No referrals in this queue.</p>
-            <p className="mt-1 text-xs text-slate-400">All caught up.</p>
+          <div className="py-24 flex flex-col items-center">
+            <span className="material-symbols-outlined text-outline mb-4" style={{ fontSize: '32px' }}>inbox</span>
+            <p className="text-sm font-semibold text-on-surface">No referrals in this queue.</p>
+            <p className="mt-1 text-xs text-on-surface-variant">All caught up.</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             {referrals.map((r) => (
               <QueueCard key={r.id} referral={r} />
             ))}

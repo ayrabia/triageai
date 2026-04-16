@@ -1,31 +1,18 @@
-import { ACTION_CONFIG } from '@/lib/utils'
 import type { ReferralAction } from '@/lib/types'
+import { ACTION_CONFIG } from '@/lib/utils'
 
 interface Props {
-  action: ReferralAction | null
-  size?: 'sm' | 'md'
+  action: ReferralAction | null | undefined
+  size?: 'sm' | 'default'
 }
 
-export default function PriorityBadge({ action, size = 'md' }: Props) {
-  if (!action) {
-    return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-400">
-        <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
-        Processing
-      </span>
-    )
-  }
-
+export default function PriorityBadge({ action, size = 'default' }: Props) {
+  if (!action) return null
   const cfg = ACTION_CONFIG[action]
-  const px = size === 'sm' ? 'px-2 py-0.5' : 'px-2.5 py-1'
-  const text = size === 'sm' ? 'text-xs' : 'text-xs font-semibold'
-
+  const cls = size === 'sm' ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-0.5 text-xs'
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full ${cfg.badgeBg} ${cfg.badgeText} ${px} ${text}`}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-white/70" />
-      {size === 'sm' ? cfg.shortLabel : cfg.label}
+    <span className={`inline-flex items-center rounded font-bold tracking-tight shrink-0 ${cfg.badgeBg} ${cfg.badgeText} ${cls}`}>
+      {cfg.shortLabel.toUpperCase()}
     </span>
   )
 }

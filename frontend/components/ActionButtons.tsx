@@ -11,33 +11,32 @@ interface Props {
   token: string
 }
 
-const ACTIONS: { status: ReferralStatus; label: string; style: string }[] = [
-  {
-    status: 'reviewed',
-    label: 'Mark Reviewed',
-    style: 'bg-indigo-600 hover:bg-indigo-700 text-white',
-  },
-  {
-    status: 'escalated',
-    label: 'Escalate',
-    style: 'bg-red-600 hover:bg-red-700 text-white',
-  },
-  {
-    status: 'approved',
-    label: 'Approve & Schedule',
-    style: 'bg-green-600 hover:bg-green-700 text-white',
-  },
-  {
-    status: 'archived',
-    label: 'Archive',
-    style: 'border border-slate-300 hover:bg-slate-50 text-slate-600',
-  },
+const ACTIONS: { status: ReferralStatus; label: string; variant: 'primary' | 'ghost' | 'danger' | 'muted' }[] = [
+  { status: 'reviewed',  label: 'Mark Reviewed',  variant: 'ghost' },
+  { status: 'approved',  label: 'Approve & Route', variant: 'primary' },
+  { status: 'escalated', label: 'Escalate',        variant: 'danger' },
+  { status: 'archived',  label: 'Archive',         variant: 'muted' },
 ]
+
+const variantClass: Record<string, string> = {
+  primary: 'bg-primary text-on-primary hover:bg-primary-container transition-colors',
+  ghost:   'bg-transparent border border-outline-variant/50 text-on-surface hover:bg-surface-container-low transition-colors',
+  danger:  'bg-tertiary-container/10 text-tertiary-container border border-tertiary-container/20 hover:bg-tertiary-container/20 transition-colors',
+  muted:   'bg-transparent border border-outline-variant/40 text-on-surface-variant hover:bg-surface-container-low transition-colors',
+}
 
 export default function ActionButtons({ referralId, currentStatus, token }: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState<ReferralStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  if (currentStatus === 'failed') {
+    return (
+      <p className="text-xs text-error">
+        Pipeline failed — check the audit trail for the error, then re-upload the PDF.
+      </p>
+    )
+  }
 
   async function handleAction(status: ReferralStatus) {
     setLoading(status)
@@ -52,38 +51,35 @@ export default function ActionButtons({ referralId, currentStatus, token }: Prop
     }
   }
 
-  // Failed referrals need pipeline retry, not a status action
-  if (currentStatus === 'failed') {
-    return (
-      <p className="text-xs text-red-600">
-        Pipeline failed — check the audit trail for the error, then re-upload the PDF.
-      </p>
-    )
-  }
-
   const available = ACTIONS.filter((a) => a.status !== currentStatus)
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap gap-2">
-        {available.map((action) => (
+      {/* Primary action first, full width */}
+      {available.filter((a) => a.variant === 'primary').map((action) => (
+        <button
+          key={action.status}
+          onClick={() => handleAction(action.status)}
+          disabled={loading !== null}
+          className={`w-full py-2.5 px-4 rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${variantClass.primary}`}
+        >
+          {loading === action.status ? 'Saving…' : action.label}
+        </button>
+      ))}
+      {/* Secondary actions in a grid */}
+      <div className="grid grid-cols-2 gap-2">
+        {available.filter((a) => a.variant !== 'primary').map((action) => (
           <button
             key={action.status}
             onClick={() => handleAction(action.status)}
             disabled={loading !== null}
-            className={`
-              rounded-lg px-4 py-2 text-sm font-medium transition-colors
-              disabled:opacity-50 disabled:cursor-not-allowed
-              ${action.style}
-            `}
+            className={`py-2 px-3 rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed ${variantClass[action.variant]}`}
           >
             {loading === action.status ? 'Saving…' : action.label}
           </button>
         ))}
       </div>
-      {error && (
-        <p className="text-xs text-red-600">{error}</p>
-      )}
+      {error && <p className="text-xs text-error">{error}</p>}
     </div>
   )
 }

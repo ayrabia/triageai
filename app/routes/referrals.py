@@ -218,9 +218,12 @@ async def upload(
     if not file.content_type or file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Only PDF files are accepted.")
 
-    pdf_bytes = await file.read()
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
+    pdf_bytes = await file.read(MAX_FILE_SIZE + 1)
     if len(pdf_bytes) == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    if len(pdf_bytes) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 50 MB.")
 
     # Pre-generate the referral ID so we can use it as the S3 key.
     referral_id = uuid_lib.uuid4()

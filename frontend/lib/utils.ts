@@ -26,46 +26,46 @@ export function formatDate(iso: string): string {
 export const ACTION_CONFIG: Record<ReferralAction, {
   label: string
   shortLabel: string
-  badgeBg: string
-  badgeText: string
-  borderColor: string
-  headerBg: string
-  dotColor: string
+  borderColor: string  // border-l-[color] class for 3px left accent
+  badgeBg: string      // badge background class
+  badgeText: string    // badge text class
+  sectionBg: string    // subtle inset section background
+  dotColor: string     // dot indicator class
 }> = {
   'PRIORITY REVIEW': {
     label: 'Priority Review',
     shortLabel: 'Priority',
-    badgeBg: 'bg-red-600',
-    badgeText: 'text-white',
-    borderColor: 'border-l-red-500',
-    headerBg: 'bg-red-50',
-    dotColor: 'bg-red-500',
+    borderColor:  'border-l-tertiary-container',
+    badgeBg:      'bg-tertiary-container',
+    badgeText:    'text-on-tertiary',
+    sectionBg:    'bg-error-container/20',
+    dotColor:     'bg-tertiary-container',
   },
   'SECONDARY APPROVAL': {
     label: 'Secondary Approval',
     shortLabel: 'Secondary',
-    badgeBg: 'bg-amber-500',
-    badgeText: 'text-white',
-    borderColor: 'border-l-amber-400',
-    headerBg: 'bg-amber-50',
-    dotColor: 'bg-amber-500',
+    borderColor:  'border-l-[#D97706]',
+    badgeBg:      'bg-secondary-container',
+    badgeText:    'text-on-secondary-container',
+    sectionBg:    'bg-secondary-container/20',
+    dotColor:     'bg-[#D97706]',
   },
   'STANDARD QUEUE': {
     label: 'Standard Queue',
     shortLabel: 'Standard',
-    badgeBg: 'bg-slate-400',
-    badgeText: 'text-white',
-    borderColor: 'border-l-slate-300',
-    headerBg: 'bg-slate-50',
-    dotColor: 'bg-slate-400',
+    borderColor:  'border-l-outline-variant',
+    badgeBg:      'bg-surface-container-high',
+    badgeText:    'text-on-surface-variant',
+    sectionBg:    'bg-surface-container-low',
+    dotColor:     'bg-outline-variant',
   },
 }
 
 export const STATUS_CONFIG: Record<ReferralStatus, { label: string; color: string }> = {
-  pending:   { label: 'Pending',    color: 'text-slate-500 bg-slate-100' },
-  failed:    { label: 'Failed',     color: 'text-red-700 bg-red-100' },
-  reviewed:  { label: 'Reviewed',   color: 'text-blue-700 bg-blue-100' },
-  approved:  { label: 'Approved',   color: 'text-green-700 bg-green-100' },
-  escalated: { label: 'Escalated',  color: 'text-red-700 bg-red-100' },
-  archived:  { label: 'Archived',   color: 'text-slate-400 bg-slate-100' },
+  pending:   { label: 'Pending',   color: 'text-on-surface-variant bg-surface-container-high' },
+  failed:    { label: 'Failed',    color: 'text-on-error bg-error' },
+  reviewed:  { label: 'Reviewed',  color: 'text-on-secondary-container bg-secondary-container' },
+  approved:  { label: 'Approved',  color: 'text-on-primary bg-primary-container' },
+  escalated: { label: 'Escalated', color: 'text-on-tertiary bg-tertiary-container' },
+  archived:  { label: 'Archived',  color: 'text-outline bg-surface-container-high' },
 }

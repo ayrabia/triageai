@@ -33,13 +33,10 @@ export default function PendingQueue() {
   const fetchReferrals = useCallback(async () => {
     if (!user) return
     try {
-      // Fetch pending (unclassified) + failed in one call each
       const [pending, failed] = await Promise.all([
         getQueue(user.idToken, { status: 'pending' }),
         getQueue(user.idToken, { status: 'failed' }),
       ])
-      // pending includes both processing (no action) and classified-but-pending-review;
-      // we only want the ones still in the pipeline (no action yet)
       const processing = pending.filter((r) => !r.action)
       setReferrals([...processing, ...failed])
       setFetchError(false)
@@ -65,8 +62,8 @@ export default function PendingQueue() {
 
   if (authLoading || loading || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <span className="material-symbols-outlined text-primary animate-spin" style={{ fontSize: '32px' }}>sync</span>
       </div>
     )
   }
@@ -75,79 +72,70 @@ export default function PendingQueue() {
   const failed = referrals.filter((r) => r.status === 'failed')
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-        <div className="mx-auto max-w-4xl px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/"
-                className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
-                </svg>
-                Home
-              </Link>
-              <span className="text-slate-200">/</span>
-              <span className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-                In Pipeline
-              </span>
+    <div className="min-h-screen bg-surface">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur-md shadow-header">
+        <div className="mx-auto max-w-4xl px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="flex items-center gap-1.5 text-sm font-medium text-on-surface-variant hover:text-primary transition-colors"
+            >
+              <span className="material-symbols-outlined" style={{ fontSize: '18px' }}>arrow_back</span>
+              Home
+            </Link>
+            <span className="h-5 w-px bg-outline-variant/40" />
+            <div className="flex items-center gap-2 px-2.5 py-1 bg-surface-container-low rounded">
+              <span className="material-symbols-outlined text-primary animate-spin" style={{ fontSize: '14px' }}>sync</span>
+              <span className="text-sm font-bold tracking-tight text-primary">In Pipeline</span>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1.5 text-xs text-slate-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-                Live · refreshes every 10s
-              </span>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
-                {referrals.length} referral{referrals.length !== 1 ? 's' : ''}
-              </span>
-            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary-fixed-dim animate-pulse" />
+            <span className="text-xs text-on-surface-variant">Live · refreshes every 10s</span>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-4xl px-6 py-8">
         {fetchError ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-            <p className="text-sm font-medium text-red-700">Could not load referrals.</p>
+          <div className="rounded-lg border border-error/20 bg-error-container/20 p-6 text-center">
+            <p className="text-sm font-medium text-error">Could not load referrals.</p>
           </div>
         ) : referrals.length === 0 ? (
-          <div className="py-24 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-              <svg className="h-6 w-6 text-slate-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
-            </div>
-            <p className="text-sm font-medium text-slate-600">Pipeline is clear.</p>
-            <p className="mt-1 text-xs text-slate-400">No referrals are currently processing.</p>
+          <div className="py-24 flex flex-col items-center">
+            <span className="material-symbols-outlined text-outline mb-4" style={{ fontSize: '32px' }}>check_circle</span>
+            <p className="text-sm font-semibold text-on-surface">Pipeline is clear.</p>
+            <p className="mt-1 text-xs text-on-surface-variant">No referrals are currently processing.</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-6">
-            {/* Processing */}
+          <div className="flex flex-col gap-8">
             {processing.length > 0 && (
               <section>
-                <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-outline mb-4">
                   Processing ({processing.length})
                 </h2>
                 <div className="flex flex-col gap-3">
                   {processing.map((r) => (
-                    <PendingCard key={r.id} referral={r} />
+                    <PipelineCard key={r.id} referral={r} />
                   ))}
                 </div>
               </section>
             )}
 
-            {/* Failed */}
             {failed.length > 0 && (
               <section>
-                <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-red-400">
-                  Failed ({failed.length})
-                </h2>
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-xs font-semibold uppercase tracking-widest text-error">
+                    Failed
+                  </h2>
+                  <span className="px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-[10px] font-bold">
+                    {failed.length} issue{failed.length !== 1 ? 's' : ''}
+                  </span>
+                </div>
                 <div className="flex flex-col gap-3">
                   {failed.map((r) => (
-                    <PendingCard
+                    <PipelineCard
                       key={r.id}
                       referral={r}
                       onDismiss={() => dismiss(r.id)}
@@ -164,7 +152,7 @@ export default function PendingQueue() {
   )
 }
 
-function PendingCard({
+function PipelineCard({
   referral,
   onDismiss,
   dismissing,
@@ -177,56 +165,51 @@ function PendingCard({
   const displayName = referral.filename ?? referral.id.slice(0, 8).toUpperCase()
 
   return (
-    <div className={`
-      flex items-center justify-between rounded-xl border bg-white p-5
-      shadow-sm border-l-4
-      ${isFailed ? 'border-slate-200 border-l-red-400' : 'border-slate-200 border-l-slate-300'}
+    <article className={`
+      bg-surface-container-lowest rounded-lg border border-outline-variant/15 border-l-[3px]
+      p-5 flex items-center gap-4
+      ${isFailed ? 'border-l-tertiary-container' : 'border-l-secondary-container'}
     `}>
-      <Link href={`/referrals/${referral.id}`} className="group flex items-center gap-3 min-w-0 flex-1">
-        {isFailed ? (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100">
-            <svg className="h-4 w-4 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-            </svg>
-          </div>
-        ) : (
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
-          </div>
-        )}
+      <Link href={`/referrals/${referral.id}`} className="group flex items-center gap-4 min-w-0 flex-1">
+        <div className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded ${
+          isFailed ? 'bg-error-container/50' : 'bg-surface-container-low'
+        }`}>
+          {isFailed ? (
+            <span className="material-symbols-outlined fill text-error" style={{ fontSize: '20px' }}>warning</span>
+          ) : (
+            <span className="material-symbols-outlined text-secondary animate-spin" style={{ fontSize: '20px' }}>sync</span>
+          )}
+        </div>
         <div className="min-w-0">
-          <span className="block truncate text-sm font-medium text-slate-800 font-mono group-hover:text-indigo-600 transition-colors">
+          <p className="text-sm font-semibold text-on-surface font-mono truncate group-hover:text-primary transition-colors">
             {displayName}
-          </span>
-          <span className="text-xs text-slate-400">
+          </p>
+          <p className={`text-xs mt-0.5 ${isFailed ? 'text-error' : 'text-on-surface-variant'}`}>
             {isFailed ? 'Pipeline failed — open to view details' : 'Extracting and classifying…'}
-          </span>
+          </p>
         </div>
       </Link>
 
-      <div className="flex items-center gap-3 shrink-0 ml-4">
-        <span className="text-xs text-slate-400">
-          {formatDate(referral.received_at)}
-          <span className="mx-1 text-slate-300">·</span>
-          {formatRelativeTime(referral.received_at)}
-        </span>
+      <div className="flex items-center gap-3 shrink-0">
+        <div className="text-right">
+          <span className="text-xs text-on-surface-variant block">{formatDate(referral.received_at)}</span>
+          <span className="text-xs text-outline block">{formatRelativeTime(referral.received_at)}</span>
+        </div>
         {isFailed && onDismiss && (
           <button
             onClick={onDismiss}
             disabled={dismissing}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 rounded border border-outline-variant/50 px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:border-error/30 hover:bg-error-container/20 hover:text-error transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {dismissing ? (
-              <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-slate-500" />
+              <span className="material-symbols-outlined animate-spin" style={{ fontSize: '12px' }}>sync</span>
             ) : (
-              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>close</span>
             )}
             Dismiss
           </button>
         )}
       </div>
-    </div>
+    </article>
   )
 }
