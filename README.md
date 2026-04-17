@@ -109,7 +109,7 @@ cd triageai
 
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-lambda.txt
 
 cp .env.example .env
 # Edit .env — set DATABASE_URL and AWS credentials
@@ -192,8 +192,7 @@ aws lambda update-function-code \
 triageai/
 ├── README.md
 ├── CLAUDE.md                              # AI context + HIPAA rules
-├── requirements.txt                       # Python deps
-├── requirements-lambda.txt                # Lambda-specific Python deps
+├── requirements-lambda.txt                # Lambda Python deps
 ├── lambda/
 │   ├── Dockerfile                         # Lambda container (python:3.11-slim + poppler)
 │   └── handler.py                         # S3 event handler — Lambda entry point
