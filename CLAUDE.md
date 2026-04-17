@@ -27,7 +27,7 @@ AWS App Runner is sunsetting (no new services after April 30, 2026). Migrating t
 | 0 — Infra | ✅ Done | ECS cluster, IAM roles, Lambda ECR repo |
 | 1 — Lambda pipeline | ✅ Done | Image built/pushed, function created, S3 trigger on `ui-uploads/*.pdf` |
 | 2 — Next.js Route Handlers | ✅ Done | All API endpoints in `frontend/app/api/` |
-| 3 — RDS SSL enforce | Pending | `sslmode=require` + `rds.force_ssl=1` |
+| 3 — RDS SSL enforce | ✅ Done | Custom param group `triageai-postgres16`, `rds.force_ssl=1`, `sslmode=require` in all DB URLs |
 | 4 — ECS deployment | Pending | Build new frontend image (no `API_URL` arg needed) |
 | 5 — Cutover | Pending | DNS switch + validation checklist |
 | 6 — FastAPI decommission | Pending | Post-validation, May 2026 |
@@ -294,7 +294,7 @@ This is a **safety requirement** — wrong action field silently drops urgent pa
 - [x] RDS encryption at rest — enabled
 - [x] App Runner + ECR deployment
 - [ ] Set `ALLOWED_ORIGINS` to production domain only (remove localhost)
-- [ ] Configure RDS to reject non-SSL connections
+- [x] Configure RDS to reject non-SSL connections — `rds.force_ssl=1` in custom param group `triageai-postgres16`, `sslmode=require` in all client URLs
 - [ ] Set up CloudWatch log groups with no PHI logging policy
 - [ ] Enable RDS automated backups with 6-year retention
 - [ ] Confirm AWS BAA covers App Runner (verify in AWS console)

@@ -23,6 +23,10 @@ engine = create_engine(
     pool_size=5,
     max_overflow=10,
     pool_pre_ping=True,  # reconnect if the RDS instance restarted
+    # Enforce SSL — sslmode=require should already be in DATABASE_URL;
+    # connect_args is a belt-and-suspenders backstop for any code path
+    # that constructs a URL without the query parameter.
+    connect_args={"sslmode": "require"},
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
