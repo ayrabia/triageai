@@ -13,6 +13,19 @@ import { CognitoJwtVerifier } from 'aws-jwt-verify'
 import { NextRequest, NextResponse } from 'next/server'
 import { sql, type DbUser } from './db'
 
+// slug → clinic_id cache (process-lifetime, avoids a DB round-trip per request)
+const _clinicSlugCache = new Map<string, string>()
+
+async function getClinicIdBySlug(slug: string): Promise<string | null> {
+  if (_clinicSlugCache.has(slug)) return _clinicSlugCache.get(slug)!
+  const rows = await sql<{ id: string }[]>`
+    SELECT id FROM clinics WHERE slug = ${slug} LIMIT 1
+  `
+  if (rows.length === 0) return null
+  _clinicSlugCache.set(slug, rows[0].id)
+  return rows[0].id
+}
+
 // Verifier is created lazily on first request — not at module load.
 // Next.js imports route modules during `next build` where env vars are absent;
 // creating the verifier at module init would throw and break the build.
@@ -93,7 +106,22 @@ export async function withAuth(request: NextRequest): Promise<DbUser> {
     throw new ApiError(403, 'User not provisioned — contact your clinic administrator')
   }
 
-  return rows[0]
+  const user = rows[0]
+
+  // Enforce subdomain → clinic isolation: reject users whose account belongs
+  // to a different clinic than the portal they're accessing.
+  const clinicSlug = request.headers.get('x-clinic-slug')
+  if (clinicSlug) {
+    const clinicId = await getClinicIdBySlug(clinicSlug)
+    if (!clinicId) {
+      throw new ApiError(404, 'Clinic not found')
+    }
+    if (user.clinic_id !== clinicId) {
+      throw new ApiError(403, 'Your account is not associated with this clinic')
+    }
+  }
+
+  return user
 }
 
 /**

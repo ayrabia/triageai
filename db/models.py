@@ -37,6 +37,7 @@ class Clinic(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(63), unique=True, nullable=False)
     specialty: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g. "ENT"
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
