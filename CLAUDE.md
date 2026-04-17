@@ -12,9 +12,25 @@ AI-powered referral triage for specialty clinics. Faxed PDFs arrive → Claude c
 
 - POC validated on 6 real de-identified ENT referrals from **Sacramento Ear, Nose & Throat (SacENT)** — 0 missed urgents, 0 silent downgrades
 - **Active pipeline: v3** (three-tier, no triage notes = production-realistic scenario)
-- **Fully deployed on AWS** — App Runner (frontend + backend), RDS, S3, Bedrock, Cognito
+- **Deployed on AWS** — App Runner (current, sunsetting), migrating to ECS + Lambda
 - Awaiting clinical validation from **Nadia Rabia** (Referral Coordinator at SacENT)
 - Pre-seed / concept stage
+
+### Migration Status (App Runner → ECS + Lambda)
+AWS App Runner is sunsetting (no new services after April 30, 2026). Migrating to:
+- **Frontend (Next.js):** ECS Express Mode (Fargate)
+- **Pipeline:** AWS Lambda (container image, S3 trigger)
+- **FastAPI:** Decommissioned after cutover
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| 0 — Infra | ✅ Done | ECS cluster, IAM roles, Lambda ECR repo |
+| 1 — Lambda pipeline | ✅ Done | Image built/pushed, function created, S3 trigger on `ui-uploads/*.pdf` |
+| 2 — Next.js Route Handlers | ✅ Done | All API endpoints in `frontend/app/api/` |
+| 3 — RDS SSL enforce | Pending | `sslmode=require` + `rds.force_ssl=1` |
+| 4 — ECS deployment | Pending | Build new frontend image (no `API_URL` arg needed) |
+| 5 — Cutover | Pending | DNS switch + validation checklist |
+| 6 — FastAPI decommission | Pending | Post-validation, May 2026 |
 
 ---
 
@@ -30,15 +46,33 @@ AI-powered referral triage for specialty clinics. Faxed PDFs arrive → Claude c
 
 ## Infrastructure (all AWS, all under BAA)
 
+### Current (App Runner — sunsetting)
 | Layer | Service |
 |-------|---------|
 | Frontend (Next.js) | AWS App Runner — ECR image `triageai-frontend` |
 | Backend (FastAPI) | AWS App Runner — ECR image `triageai-backend` |
+
+### Target (ECS + Lambda)
+| Layer | Service |
+|-------|---------|
+| Frontend (Next.js) | ECS Express Mode (Fargate) — ECR image `triageai-frontend` |
+| Pipeline | AWS Lambda — ECR image `triageai-pipeline`, S3 trigger on `ui-uploads/*.pdf` |
+| FastAPI | Decommissioned (post-cutover) |
+
+### Shared (unchanged)
+| Layer | Service |
+|-------|---------|
 | Database | AWS RDS PostgreSQL (`triageai-prod.cqdyykwmcudh.us-east-1.rds.amazonaws.com`) |
 | Auth | AWS Cognito — User Pool `us-east-1_B5EPFtIfW`, Client `5ln3morakigit80ae0m8i295qb` |
 | Storage | AWS S3 — bucket `triageai-test-referrals` |
 | LLM | AWS Bedrock — `us.anthropic.claude-sonnet-4-6` |
 | Container registry | AWS ECR — `177884821405.dkr.ecr.us-east-1.amazonaws.com` |
+
+### Lambda pipeline
+- Function: `triageai-pipeline` (`arn:aws:lambda:us-east-1:177884821405:function:triageai-pipeline`)
+- Trigger: S3 `ObjectCreated` on `triageai-test-referrals/ui-uploads/*.pdf`
+- Memory: 1024 MB, Timeout: 300s
+- Rebuild: `docker build --platform linux/amd64 --provenance=false --sbom=false -t ...` (**must use `--provenance=false`** — Lambda rejects OCI manifest lists from buildx)
 
 ### Redeploying
 
@@ -163,11 +197,13 @@ Fax PDF (S3, AES-256)
 ## Frontend Structure
 
 Pages:
-- `/` — Home dashboard: 3 tier nav cards (counts + links) + upload zone + in-pipeline card
+- `/` — Home dashboard: role-aware (coordinators: tier cards + upload; physicians: my queue + all cases)
 - `/priority` — Priority Review queue
 - `/secondary` — Secondary Approval queue
 - `/standard` — Standard Queue
 - `/pending` — In-pipeline queue (processing + failed), polls every 10s
+- `/my-queue` — Physician's assigned referrals
+- `/all-cases` — Physician's view of all referrals
 - `/referrals/[id]` — Referral detail + PDF viewer
 - `/login` — Cognito login with show/hide password
 
@@ -176,8 +212,23 @@ Key components:
 - `PendingQueue.tsx` — in-pipeline queue with Dismiss button (archives failed referrals)
 - `QueueCard.tsx` — urgency badge always first, filename shown
 - `UploadZone.tsx` — drag-and-drop PDF upload
+- `ActionButtons.tsx` — role-aware: physicians see Mark Reviewed + Archive; coordinators/admins see Approve & Route + escalate
+- `RouteModal.tsx` — physician picker modal for coordinator routing
 
 **Archived referrals** (dismissed via Dismiss button) are excluded from all queue counts — the home page filters `status !== 'archived'` client-side.
+
+### Next.js Route Handlers (`frontend/app/api/`)
+- `GET  /api/referrals` — paginated queue with filters
+- `POST /api/referrals/upload` — PDF upload → S3 + DB insert
+- `POST /api/referrals/ingest` — pipeline callback (PIPELINE_SECRET auth)
+- `GET  /api/referrals/[id]` — referral detail + audit log write
+- `PATCH /api/referrals/[id]/status` — status transitions
+- `POST /api/referrals/[id]/route` — route to physician (coordinator/admin only)
+- `GET  /api/referrals/[id]/pdf` — presigned S3 URL (5 min TTL)
+- `GET  /api/referrals/[id]/audit` — audit trail (coordinator/admin only)
+- `GET  /api/users/me` — current user profile
+- `GET  /api/users/physicians` — list physicians in clinic
+- `GET  /api/health` — health check
 
 ---
 

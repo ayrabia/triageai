@@ -22,6 +22,7 @@ from pathlib import Path
 from uuid import UUID
 
 import boto3
+from botocore.config import Config
 
 from db.enums import ReferralAction, ReferralStatus
 from db.models import AuditLog, Referral
@@ -78,7 +79,11 @@ def _call_claude(image_content: list[dict]) -> dict:
     """Send page images + prompt to Claude via Bedrock. Returns parsed JSON."""
     payload = image_content + [{"type": "text", "text": CLAUDE_PROMPT}]
 
-    bedrock = boto3.client("bedrock-runtime", region_name=AWS_REGION)
+    bedrock = boto3.client(
+        "bedrock-runtime",
+        region_name=AWS_REGION,
+        config=Config(read_timeout=120, connect_timeout=10),
+    )
     response = bedrock.invoke_model(
         modelId=CLAUDE_MODEL_ID,
         contentType="application/json",
