@@ -4,6 +4,11 @@
  * Uses the `postgres` package (tagged template literals = natural parameterization,
  * no SQL injection possible when values are interpolated via ${}).
  *
+ * Pool is created lazily on first request — NOT at module load time.
+ * This is required because Next.js imports route modules during the build
+ * step (to collect page metadata), where DATABASE_URL is not available.
+ * Throwing at module init would break `next build`.
+ *
  * The global singleton pattern prevents multiple pools during Next.js dev hot reloads.
  * In production (ECS, long-running process) there is always exactly one pool.
  */
@@ -16,20 +21,42 @@ declare global {
   var _pgPool: ReturnType<typeof postgres> | undefined
 }
 
-const DATABASE_URL = process.env.DATABASE_URL
-if (!DATABASE_URL) throw new Error('DATABASE_URL environment variable is not set')
+function getPool(): ReturnType<typeof postgres> {
+  if (global._pgPool) return global._pgPool
 
-// Append sslmode=require if not already present — enforces encrypted transit to RDS
-const dbUrl = DATABASE_URL.includes('sslmode') ? DATABASE_URL : `${DATABASE_URL}?sslmode=require`
+  const DATABASE_URL = process.env.DATABASE_URL
+  if (!DATABASE_URL) throw new Error('DATABASE_URL environment variable is not set')
 
-export const sql = global._pgPool ?? postgres(dbUrl, {
-  max: 10,
-  idle_timeout: 20,
-  connect_timeout: 10,
-  ssl: { rejectUnauthorized: false }, // RDS uses AWS-managed certs; sslmode=require is enforced above
+  // Append sslmode=require if not already present — enforces encrypted transit to RDS
+  const dbUrl = DATABASE_URL.includes('sslmode') ? DATABASE_URL : `${DATABASE_URL}?sslmode=require`
+
+  const pool = postgres(dbUrl, {
+    max: 10,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    ssl: { rejectUnauthorized: false }, // RDS uses AWS-managed certs; sslmode=require is enforced above
+  })
+
+  // Cache in global so dev hot reloads reuse the same pool
+  global._pgPool = pool
+  return pool
+}
+
+/**
+ * Tagged template literal proxy — forwards all operations to the lazily-created pool.
+ * Usage is identical to a direct `postgres` instance: sql`SELECT ...`
+ */
+export const sql: ReturnType<typeof postgres> = new Proxy({} as ReturnType<typeof postgres>, {
+  get(_target, prop) {
+    const pool = getPool()
+    const value = (pool as unknown as Record<string | symbol, unknown>)[prop]
+    if (typeof value === 'function') return value.bind(pool)
+    return value
+  },
+  apply(_target, _thisArg, args) {
+    return (getPool() as unknown as (...a: unknown[]) => unknown)(...args)
+  },
 })
-
-if (process.env.NODE_ENV !== 'production') global._pgPool = sql
 
 // ---------------------------------------------------------------------------
 // DB row types (minimal — enough for the route handlers)

@@ -13,19 +13,25 @@ import { CognitoJwtVerifier } from 'aws-jwt-verify'
 import { NextRequest, NextResponse } from 'next/server'
 import { sql, type DbUser } from './db'
 
-const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID ?? ''
-const CLIENT_ID = process.env.COGNITO_APP_CLIENT_ID ?? process.env.NEXT_PUBLIC_COGNITO_APP_CLIENT_ID ?? ''
+// Verifier is created lazily on first request — not at module load.
+// Next.js imports route modules during `next build` where env vars are absent;
+// creating the verifier at module init would throw and break the build.
+let _verifier: ReturnType<typeof CognitoJwtVerifier.create> | undefined
 
-if (!USER_POOL_ID || !CLIENT_ID) {
-  console.warn('[auth] COGNITO_USER_POOL_ID or COGNITO_APP_CLIENT_ID is not set')
+function getVerifier() {
+  if (_verifier) return _verifier
+  const userPoolId = process.env.COGNITO_USER_POOL_ID
+  const clientId = process.env.COGNITO_APP_CLIENT_ID ?? process.env.NEXT_PUBLIC_COGNITO_APP_CLIENT_ID
+  if (!userPoolId || !clientId) {
+    throw new ApiError(500, 'Cognito configuration missing — check COGNITO_USER_POOL_ID and COGNITO_APP_CLIENT_ID')
+  }
+  _verifier = CognitoJwtVerifier.create({
+    userPoolId,
+    tokenUse: 'id',      // Rejects Access Tokens; only ID Tokens are accepted
+    clientId,
+  })
+  return _verifier
 }
-
-// Module-level singleton — JWKS is cached after first fetch
-const verifier = CognitoJwtVerifier.create({
-  userPoolId: USER_POOL_ID,
-  tokenUse: 'id',      // Rejects Access Tokens; only ID Tokens are accepted
-  clientId: CLIENT_ID,
-})
 
 // ---------------------------------------------------------------------------
 // Error types
@@ -70,7 +76,7 @@ export async function withAuth(request: NextRequest): Promise<DbUser> {
 
   let sub: string
   try {
-    const payload = await verifier.verify(token)
+    const payload = await getVerifier().verify(token)
     sub = payload.sub
   } catch {
     throw new ApiError(401, 'Invalid or expired token')
