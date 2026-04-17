@@ -29,7 +29,7 @@ AWS App Runner is sunsetting (no new services after April 30, 2026). Migrating t
 | 2 — Next.js Route Handlers | ✅ Done | All API endpoints in `frontend/app/api/` |
 | 3 — RDS SSL enforce | ✅ Done | Custom param group `triageai-postgres16`, `rds.force_ssl=1`, `sslmode=require` in all DB URLs |
 | 4 — ECS deployment | ✅ Done | ECS Fargate service running behind ALB `triageai-alb-554035616.us-east-1.elb.amazonaws.com` |
-| 5 — Cutover | Pending | DNS switch + HTTPS certificate + validation checklist |
+| 5 — Cutover | ✅ Done | `app.usetriageai.com` live on ECS with HTTPS (TLS 1.3), HTTP→HTTPS redirect |
 | 6 — FastAPI decommission | Pending | Post-validation, May 2026 |
 
 ---
@@ -38,8 +38,8 @@ AWS App Runner is sunsetting (no new services after April 30, 2026). Migrating t
 
 | Service | URL | Status |
 |---------|-----|--------|
-| Frontend (App Runner) | https://md7czsu392.us-east-1.awsapprunner.com | Active (sunsetting) |
-| Frontend (ECS) | http://triageai-alb-554035616.us-east-1.elb.amazonaws.com | Active (Phase 5 cutover pending) |
+| Frontend (ECS) | https://app.usetriageai.com | Active (primary) |
+| Frontend (App Runner) | https://md7czsu392.us-east-1.awsapprunner.com | Sunsetting (decommission after validation) |
 | Backend (FastAPI) | https://3pkp9qp3ku.us-east-1.awsapprunner.com | Active (decommission Phase 6) |
 | API docs | https://3pkp9qp3ku.us-east-1.awsapprunner.com/docs | Active (decommission Phase 6) |
 
