@@ -48,11 +48,8 @@ TriageAI ingests faxed referrals, extracts clinical information using Claude via
 ## Current Status (April 2026)
 
 - **POC validated** on 6 real de-identified ENT referrals from Sacramento ENT — 0 missed urgents, 0 silent downgrades
-- **Backend complete** — FastAPI + PostgreSQL with full queue, detail, upload, status update, audit trail, and physician routing endpoints
-- **Frontend complete** — Next.js multi-page queue (Priority / Secondary / Standard / In Pipeline) with per-tier views, urgency badges, filename display, 30s auto-refresh, and role-based UI
-- **Physician routing** — coordinators route referrals to physicians via a modal picker; physicians have a dedicated My Queue + All Cases view
-- **Auth live** — AWS Cognito (JWT, USER_PASSWORD_AUTH flow)
-- **Fully deployed on AWS** — App Runner (frontend + backend), RDS, S3, Bedrock, Cognito
+- **Fully deployed on AWS** — ECS Fargate (frontend) + Lambda (pipeline), RDS, S3, Bedrock, Cognito
+- **Live at** [app.usetriageai.com](https://app.usetriageai.com)
 - **Awaiting clinical validation** from Nadia Rabia (Referral Coordinator, SacENT)
 - Pre-seed / concept stage
 
@@ -73,28 +70,25 @@ TriageAI ingests faxed referrals, extracts clinical information using Claude via
 
 | Layer | Technology |
 |-------|------------|
-| LLM / OCR | Claude Sonnet 4.6 via AWS Bedrock (primary), GPT-4o fallback |
-| Backend | FastAPI + Uvicorn → AWS App Runner |
-| Frontend | Next.js 14 + Tailwind CSS → AWS App Runner |
-| Database | PostgreSQL — AWS RDS (encrypted at rest) |
-| Migrations | Alembic (runs on container startup) |
+| LLM | Claude Sonnet 4.6 via AWS Bedrock |
+| Pipeline | AWS Lambda (container image, S3 trigger) |
+| Frontend | Next.js 14 + Tailwind CSS → ECS Fargate behind ALB |
+| API | Next.js Route Handlers (co-located with frontend, no separate backend) |
+| Database | PostgreSQL — AWS RDS (encrypted at rest, SSL enforced) |
+| Migrations | Alembic |
 | Auth | AWS Cognito (USER_PASSWORD_AUTH, JWT) |
 | Container registry | AWS ECR |
 | Storage | AWS S3 (AES-256 SSE) |
+| Backups | AWS Backup — 6-year retention (HIPAA) |
 | Fax ingestion | Phaxio / Documo (planned) |
-| Demo UI | Streamlit |
-| Encryption | AES-256 at rest, TLS 1.2+ in transit |
+| Encryption | AES-256 at rest, TLS 1.3 in transit |
 | Cloud | AWS — all services under existing AWS BAA |
 
 ---
 
-## Production URLs
+## Production URL
 
-| Service | URL |
-|---------|-----|
-| Frontend | https://md7czsu392.us-east-1.awsapprunner.com |
-| Backend | https://3pkp9qp3ku.us-east-1.awsapprunner.com |
-| API docs | https://3pkp9qp3ku.us-east-1.awsapprunner.com/docs |
+**[https://app.usetriageai.com](https://app.usetriageai.com)**
 
 ---
 
@@ -105,23 +99,18 @@ TriageAI ingests faxed referrals, extracts clinical information using Claude via
 - Python 3.11+
 - Node.js 18+
 - Docker (for local PostgreSQL)
-- AWS credentials configured (for pipeline runs)
+- AWS credentials configured
 
-### Backend Setup
+### Pipeline Setup
 
 ```bash
-# Clone and enter the repo
 git clone https://github.com/ayrabia/triageai.git
 cd triageai
 
-# Create virtual environment
 python -m venv venv
 source venv/bin/activate
-
-# Install dependencies
 pip install -r requirements.txt
 
-# Configure environment
 cp .env.example .env
 # Edit .env — set DATABASE_URL and AWS credentials
 
@@ -134,48 +123,24 @@ docker run -d \
   -p 5432:5432 \
   postgres:16
 
-# Run migrations
 alembic upgrade head
-
-# Seed with de-identified test referrals
-python scripts/seed.py
-
-# Start the API
-uvicorn app.main:app --reload
 ```
-
-API docs at [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ### Frontend Setup
 
 ```bash
 cd frontend
 npm install
+# Create frontend/.env.local with:
+#   DATABASE_URL=postgresql://triageai:password@localhost:5432/triageai
+#   COGNITO_USER_POOL_ID=us-east-1_B5EPFtIfW
+#   COGNITO_APP_CLIENT_ID=5ln3morakigit80ae0m8i295qb
+#   NEXT_PUBLIC_COGNITO_REGION=us-east-1
+#   NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=5ln3morakigit80ae0m8i295qb
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
-
-### Run the Streamlit Demo
-
-```bash
-streamlit run streamlit_demo/demo.py
-```
-
-### Share Locally via ngrok
-
-ngrok lets you expose the local app to anyone with a URL — useful for demos without deploying.
-
-**How it works:** The Next.js frontend proxies all `/api/*` calls to the FastAPI backend on localhost:8000 (via `next.config.mjs`). Only port 3000 needs to be tunneled.
-
-```bash
-# 1. Make sure both services are running (backend on :8000, frontend on :3000)
-
-# 2. Tunnel the frontend — rewrite Host header so Next.js dev server accepts the ngrok domain
-ngrok http --host-header=rewrite 3000
-```
-
-> **Note:** The ngrok URL is public while the tunnel is running. Do not run real patient data through a local demo session.
 
 ### Run Tests
 
@@ -187,32 +152,35 @@ pytest classifier/test_classifier.py -v
 
 ## Deploying to AWS
 
-Both services run as Docker containers on AWS App Runner. ECR stores the images.
+### Frontend (ECS Fargate)
 
 ```bash
-# Authenticate Docker with ECR
 aws ecr get-login-password --region us-east-1 | \
   docker login --username AWS --password-stdin 177884821405.dkr.ecr.us-east-1.amazonaws.com
 
-# Build and push backend
-docker build --platform linux/amd64 -t triageai-backend:latest .
-docker tag triageai-backend:latest 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-backend:latest
-docker push 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-backend:latest
-
-# Build and push frontend (API_URL baked in at build time)
 cd frontend
 docker build --platform linux/amd64 \
-  --build-arg API_URL=https://3pkp9qp3ku.us-east-1.awsapprunner.com \
-  -t triageai-frontend:latest .
-docker tag triageai-frontend:latest 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-frontend:latest
+  --build-arg NEXT_PUBLIC_COGNITO_REGION=us-east-1 \
+  --build-arg NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=5ln3morakigit80ae0m8i295qb \
+  -t 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-frontend:latest .
 docker push 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-frontend:latest
+
+aws ecs update-service --cluster triageai --service triageai-frontend \
+  --force-new-deployment --region us-east-1
 ```
 
-After pushing, trigger a new deployment from the App Runner console or via:
+### Pipeline (Lambda)
 
 ```bash
-aws apprunner start-deployment \
-  --service-arn <service-arn> \
+# Must use --provenance=false — Lambda rejects OCI manifest lists from buildx
+docker build --platform linux/amd64 --provenance=false --sbom=false \
+  -t 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-pipeline:latest \
+  -f lambda/Dockerfile .
+docker push 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-pipeline:latest
+
+aws lambda update-function-code \
+  --function-name triageai-pipeline \
+  --image-uri 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-pipeline:latest \
   --region us-east-1
 ```
 
@@ -224,105 +192,97 @@ aws apprunner start-deployment \
 triageai/
 ├── README.md
 ├── CLAUDE.md                              # AI context + HIPAA rules
-├── requirements.txt
-├── .env.example
-├── Dockerfile                             # Backend container (FastAPI + poppler)
-├── .dockerignore
+├── requirements.txt                       # Python deps
+├── requirements-lambda.txt                # Lambda-specific Python deps
+├── lambda/
+│   ├── Dockerfile                         # Lambda container (python:3.11-slim + poppler)
+│   └── handler.py                         # S3 event handler — Lambda entry point
 │
 ├── db/
 │   ├── enums.py                           # ReferralStatus, ReferralAction, UserRole
 │   ├── models.py                          # SQLAlchemy ORM models
-│   └── session.py                         # DB engine + get_db dependency
+│   └── session.py                         # DB engine + session factory
 │
 ├── alembic/
-│   ├── env.py
-│   └── versions/
-│       ├── 0001_initial_schema.py
-│       ├── 0002_widen_recommended_window.py
-│       └── 0003_add_filename.py
-│
-├── app/
-│   ├── main.py                            # FastAPI entry point + CORS
-│   ├── auth.py                            # Cognito JWT verification
-│   ├── dependencies.py                    # get_db, get_current_user
-│   └── routes/
-│       ├── referrals.py                   # Queue, detail, upload, ingest, status, audit
-│       ├── users.py                       # User management
-│       └── health.py                      # GET /health
+│   └── versions/                          # DB migration files
 │
 ├── pipeline/
-│   ├── pipeline_test_v2.py                # v3 pipeline script (active)
-│   ├── run.py                             # Callable wrapper for background tasks
-│   ├── ocr.py                             # AWS Textract wrapper
-│   ├── nlp.py                             # AWS Comprehend Medical wrapper
-│   └── missing_info.py                    # Rule-based missing field detection
+│   ├── run.py                             # process_referral() — called by Lambda
+│   ├── ocr.py
+│   ├── nlp.py
+│   └── missing_info.py
+│
+├── classifier/
+│   ├── classifier.py                      # Core LLM classifier
+│   ├── prompts.py                         # ENT + specialty prompts
+│   └── criteria.py                        # ENT urgent criteria
 │
 ├── frontend/
 │   ├── Dockerfile                         # Next.js standalone container
-│   ├── .dockerignore
-│   ├── next.config.mjs                    # Standalone output + /api proxy
+│   ├── next.config.mjs
 │   ├── app/
-│   │   ├── page.tsx                       # Home dashboard — role-aware (coordinator vs physician)
-│   │   ├── priority/page.tsx              # Priority Review queue
-│   │   ├── secondary/page.tsx             # Secondary Approval queue
-│   │   ├── standard/page.tsx              # Standard Queue
+│   │   ├── page.tsx                       # Home dashboard (role-aware)
+│   │   ├── priority/page.tsx
+│   │   ├── secondary/page.tsx
+│   │   ├── standard/page.tsx
 │   │   ├── pending/page.tsx               # In-pipeline / failed referrals
-│   │   ├── my-queue/page.tsx              # Physician: referrals assigned to them
+│   │   ├── my-queue/page.tsx              # Physician: assigned referrals
 │   │   ├── all-cases/page.tsx             # Physician: all clinic referrals
 │   │   ├── referrals/[id]/page.tsx        # Referral detail + PDF viewer
-│   │   ├── login/page.tsx                 # Cognito login
-│   │   └── api/                           # Next.js route handlers (Cognito proxy)
+│   │   ├── login/page.tsx
+│   │   └── api/                           # Route Handlers (all API endpoints)
+│   │       ├── _lib/
+│   │       │   ├── db.ts                  # postgres pool (lazy singleton)
+│   │       │   └── auth.ts                # Cognito JWT + withAuth()
+│   │       ├── referrals/
+│   │       │   ├── route.ts               # GET queue
+│   │       │   ├── upload/route.ts        # POST upload → S3 + DB
+│   │       │   ├── ingest/route.ts        # POST pipeline callback
+│   │       │   └── [id]/
+│   │       │       ├── route.ts           # GET detail
+│   │       │       ├── status/route.ts    # PATCH status
+│   │       │       ├── route/route.ts     # POST route to physician
+│   │       │       ├── pdf/route.ts       # GET presigned S3 URL
+│   │       │       └── audit/route.ts     # GET audit trail
+│   │       └── users/
+│   │           ├── me/route.ts
+│   │           └── physicians/route.ts
 │   ├── components/
-│   │   ├── TierQueue.tsx                  # Shared tier page component
-│   │   ├── PendingQueue.tsx               # In-pipeline queue component
-│   │   ├── QueueCard.tsx                  # Referral card (badge-first)
-│   │   ├── RouteModal.tsx                 # Physician picker modal (coordinator use)
-│   │   ├── ActionButtons.tsx              # Role-aware triage action buttons
-│   │   ├── UploadZone.tsx                 # Drag-and-drop PDF upload
-│   │   └── PriorityBadge.tsx
+│   │   ├── TierQueue.tsx
+│   │   ├── PendingQueue.tsx
+│   │   ├── QueueCard.tsx
+│   │   ├── RouteModal.tsx
+│   │   ├── ActionButtons.tsx
+│   │   └── UploadZone.tsx
 │   └── lib/
-│       ├── api.ts                         # API client
-│       ├── auth.ts                        # Cognito auth context
-│       ├── types.ts                       # TypeScript types
-│       └── utils.ts                       # ACTION_CONFIG, formatting
-│
-├── scripts/
-│   └── seed.py                            # Load de-identified test referrals into DB
-│
-├── classifier/
-│   ├── classifier.py                      # Core classifier
-│   ├── prompts.py                         # ENT + specialty prompts
-│   └── test_classifier.py                 # Pytest suite
-│
-├── evaluation/
-│   ├── score.py                           # Precision/recall/F1 evaluation
-│   └── results/                           # JSON metrics per eval run
-│
-├── streamlit_demo/
-│   └── demo.py                            # Interactive demo UI
+│       ├── api.ts
+│       ├── auth.ts
+│       ├── types.ts
+│       └── utils.ts
 │
 └── referrals/
-    ├── Redacted_Referrals/                # 6 de-identified test referrals (R01–R06)
-    └── Training_Redacted_Referrals/       # Training set used for v3 evaluation
+    └── Redacted_Referrals/                # 6 de-identified test referrals (R01–R06)
 ```
 
 ---
 
 ## API Endpoints
 
+All served by Next.js Route Handlers at `app.usetriageai.com/api/`:
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/referrals/ingest` | Accept new fax S3 key, kick off pipeline |
-| `POST` | `/referrals/upload` | Direct PDF upload from UI |
-| `GET` | `/referrals/` | Paginated queue sorted by priority tier (`assigned_to_me=true` for physician queue) |
-| `GET` | `/referrals/{id}` | Full referral detail |
-| `PATCH` | `/referrals/{id}/status` | Update status + write audit log |
-| `POST` | `/referrals/{id}/route` | Route to a physician (COORDINATOR/ADMIN only) |
-| `GET` | `/referrals/{id}/audit` | HIPAA audit trail |
-| `GET` | `/referrals/{id}/pdf` | Short-lived presigned S3 URL for the PDF |
-| `GET` | `/users/me` | Authenticated user profile + clinic info |
-| `GET` | `/users/physicians` | List physicians at the caller's clinic |
-| `GET` | `/health` | Health check |
+| `GET` | `/api/referrals` | Paginated queue sorted by priority tier |
+| `POST` | `/api/referrals/upload` | PDF upload → S3 + DB row |
+| `POST` | `/api/referrals/ingest` | Pipeline callback (PIPELINE_SECRET auth) |
+| `GET` | `/api/referrals/[id]` | Full referral detail + audit log write |
+| `PATCH` | `/api/referrals/[id]/status` | Status transition |
+| `POST` | `/api/referrals/[id]/route` | Route to physician (coordinator/admin only) |
+| `GET` | `/api/referrals/[id]/pdf` | Presigned S3 URL (5 min TTL) |
+| `GET` | `/api/referrals/[id]/audit` | HIPAA audit trail |
+| `GET` | `/api/users/me` | Authenticated user profile |
+| `GET` | `/api/users/physicians` | Physicians at caller's clinic |
+| `GET` | `/api/health` | Health check |
 
 ---
 
@@ -330,17 +290,16 @@ triageai/
 
 TriageAI is designed for HIPAA compliance from day one:
 
-- PHI encrypted at rest (**AES-256**) and in transit (**TLS 1.2+**)
+- PHI encrypted at rest (**AES-256**) and in transit (**TLS 1.3**)
 - AWS Bedrock used under **existing AWS BAA** — no separate agreement needed
 - **No PHI in logs** — structured logs contain only UUIDs, enums, and timing
-- **Append-only audit trail** with 6-year retention requirement
-- Role-based access control per clinic (Auth0/Cognito — planned)
-- Multi-clinic data isolation enforced at the query level
-- GPT-4o fallback is **not BAA-covered** — do not route real PHI through it
+- **Append-only audit trail** — every view, status change, and PDF access is logged
+- **6-year backup retention** via AWS Backup (HIPAA requirement)
+- **RDS SSL enforced** — `rds.force_ssl=1`, all clients use `sslmode=require`
+- Role-based access control — ADMIN, COORDINATOR, PHYSICIAN roles
+- Multi-clinic data isolation enforced at the query level (`clinic_id` scoping)
 
 > **Important:** TriageAI is an **administrative workflow tool**, not a clinical decision support system. The AI surfaces information — triage staff make all final decisions.
-
-See `CLAUDE.md` for full HIPAA rules and pre-production checklist.
 
 ---
 
@@ -365,18 +324,18 @@ See `CLAUDE.md` for full HIPAA rules and pre-production checklist.
 - [x] Three-tier classification (Priority / Secondary / Standard)
 - [x] v3 pipeline validated on 6 de-identified ENT referrals
 - [x] PostgreSQL schema + Alembic migrations
-- [x] FastAPI backend (queue, detail, upload, ingest, audit endpoints)
+- [x] Next.js Route Handlers — full API (queue, upload, detail, status, routing, audit, PDF)
 - [x] Next.js frontend — per-tier pages, urgency-first cards, filename display, in-pipeline queue
 - [x] Drag-and-drop PDF upload with live status tracking
 - [x] AWS Cognito authentication (JWT)
-- [x] AWS RDS production database (encrypted at rest)
-- [x] Fully deployed on AWS App Runner (frontend + backend, no Vercel/Railway)
-- [x] Seed script with de-identified test data
-- [x] Streamlit demo
-- [x] Physician role + referral routing workflow (coordinator routes → physician reviews)
+- [x] AWS RDS production database (encrypted at rest, SSL enforced)
+- [x] Lambda pipeline — S3 trigger, automatic classification on upload
+- [x] ECS Fargate + ALB — live at app.usetriageai.com (HTTPS, TLS 1.3)
+- [x] Physician role + referral routing workflow
+- [x] 6-year HIPAA backup retention (AWS Backup)
 - [ ] Clinical validation — Nadia Rabia (SacENT)
 - [ ] Provision first physician account for end-to-end routing test
-- [ ] Phaxio fax ingestion + S3 Lambda trigger
+- [ ] Phaxio fax ingestion
 - [ ] Cardiology specialty criteria
 - [ ] Orthopedics specialty criteria
 - [ ] Multi-clinic onboarding

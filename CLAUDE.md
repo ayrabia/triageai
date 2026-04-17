@@ -266,9 +266,9 @@ This is a **safety requirement** — wrong action field silently drops urgent pa
 - [x] ECS + Lambda deployment on ECR
 - [x] Configure RDS to reject non-SSL connections — `rds.force_ssl=1` in custom param group `triageai-postgres16`, `sslmode=require` in all client URLs
 - [x] HTTPS enforced — TLS 1.3 on ALB, HTTP→HTTPS redirect
-- [ ] Set `ALLOWED_ORIGINS` to production domain only (remove localhost) — update ECS task definition env
+- [x] ALLOWED_ORIGINS — N/A for Next.js Route Handlers (same-origin architecture; was a FastAPI concern only)
+- [x] Enable RDS automated backups with 6-year retention — AWS Backup plan `triageai-hipaa-6yr`, vault `triageai-hipaa-vault`, 2190-day retention; RDS deletion protection enabled
 - [ ] Set up CloudWatch log groups with no PHI logging policy
-- [ ] Enable RDS automated backups with 6-year retention
 - [ ] Penetration test before go-live
 
 ---
