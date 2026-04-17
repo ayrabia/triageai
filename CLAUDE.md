@@ -12,55 +12,22 @@ AI-powered referral triage for specialty clinics. Faxed PDFs arrive → Claude c
 
 - POC validated on 6 real de-identified ENT referrals from **Sacramento Ear, Nose & Throat (SacENT)** — 0 missed urgents, 0 silent downgrades
 - **Active pipeline: v3** (three-tier, no triage notes = production-realistic scenario)
-- **Deployed on AWS** — App Runner (current, sunsetting), migrating to ECS + Lambda
+- **Deployed on AWS** — ECS Fargate (frontend) + Lambda (pipeline)
 - Awaiting clinical validation from **Nadia Rabia** (Referral Coordinator at SacENT)
 - Pre-seed / concept stage
-
-### Migration Status (App Runner → ECS + Lambda)
-AWS App Runner is sunsetting (no new services after April 30, 2026). Migrating to:
-- **Frontend (Next.js):** ECS Express Mode (Fargate)
-- **Pipeline:** AWS Lambda (container image, S3 trigger)
-- **FastAPI:** Decommissioned after cutover
-
-| Phase | Status | Description |
-|-------|--------|-------------|
-| 0 — Infra | ✅ Done | ECS cluster, IAM roles, Lambda ECR repo |
-| 1 — Lambda pipeline | ✅ Done | Image built/pushed, function created, S3 trigger on `ui-uploads/*.pdf` |
-| 2 — Next.js Route Handlers | ✅ Done | All API endpoints in `frontend/app/api/` |
-| 3 — RDS SSL enforce | ✅ Done | Custom param group `triageai-postgres16`, `rds.force_ssl=1`, `sslmode=require` in all DB URLs |
-| 4 — ECS deployment | ✅ Done | ECS Fargate service running behind ALB `triageai-alb-554035616.us-east-1.elb.amazonaws.com` |
-| 5 — Cutover | ✅ Done | `app.usetriageai.com` live on ECS with HTTPS (TLS 1.3), HTTP→HTTPS redirect |
-| 6 — FastAPI decommission | Pending | Post-validation, May 2026 |
 
 ---
 
 ## Production URLs
 
-| Service | URL | Status |
-|---------|-----|--------|
-| Frontend (ECS) | https://app.usetriageai.com | Active (primary) |
-| Frontend (App Runner) | https://md7czsu392.us-east-1.awsapprunner.com | Sunsetting (decommission after validation) |
-| Backend (FastAPI) | https://3pkp9qp3ku.us-east-1.awsapprunner.com | Active (decommission Phase 6) |
-| API docs | https://3pkp9qp3ku.us-east-1.awsapprunner.com/docs | Active (decommission Phase 6) |
+| Service | URL |
+|---------|-----|
+| Frontend | https://app.usetriageai.com |
 
 ---
 
 ## Infrastructure (all AWS, all under BAA)
 
-### Current (App Runner — sunsetting)
-| Layer | Service |
-|-------|---------|
-| Frontend (Next.js) | AWS App Runner — ECR image `triageai-frontend` |
-| Backend (FastAPI) | AWS App Runner — ECR image `triageai-backend` |
-
-### Target (ECS + Lambda)
-| Layer | Service |
-|-------|---------|
-| Frontend (Next.js) | ECS Express Mode (Fargate) — ECR image `triageai-frontend` |
-| Pipeline | AWS Lambda — ECR image `triageai-pipeline`, S3 trigger on `ui-uploads/*.pdf` |
-| FastAPI | Decommissioned (post-cutover) |
-
-### Shared (unchanged)
 | Layer | Service |
 |-------|---------|
 | Database | AWS RDS PostgreSQL (`triageai-prod.cqdyykwmcudh.us-east-1.rds.amazonaws.com`) |
@@ -82,24 +49,27 @@ AWS App Runner is sunsetting (no new services after April 30, 2026). Migrating t
 aws ecr get-login-password --region us-east-1 | \
   docker login --username AWS --password-stdin 177884821405.dkr.ecr.us-east-1.amazonaws.com
 
-# Backend
-cd /path/to/triageai
-docker build --platform linux/amd64 -t triageai-backend:latest .
-docker tag triageai-backend:latest 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-backend:latest
-docker push 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-backend:latest
-
-# Frontend — NEXT_PUBLIC_* vars MUST be passed at build time (baked into bundle)
+# Frontend (Next.js) — NEXT_PUBLIC_* vars must be passed at build time
 cd frontend
 docker build --platform linux/amd64 \
-  --build-arg API_URL=https://3pkp9qp3ku.us-east-1.awsapprunner.com \
   --build-arg NEXT_PUBLIC_COGNITO_REGION=us-east-1 \
   --build-arg NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=5ln3morakigit80ae0m8i295qb \
-  -t triageai-frontend:latest .
-docker tag triageai-frontend:latest 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-frontend:latest
+  -t 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-frontend:latest .
 docker push 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-frontend:latest
+# Force ECS to pull the new image
+aws ecs update-service --cluster triageai --service triageai-frontend \
+  --force-new-deployment --region us-east-1
 
-# Trigger redeployment
-aws apprunner start-deployment --service-arn <arn> --region us-east-1
+# Pipeline (Lambda) — must use --provenance=false (Lambda rejects OCI manifest lists)
+cd /path/to/triageai
+docker build --platform linux/amd64 --provenance=false --sbom=false \
+  -t 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-pipeline:latest \
+  -f lambda/Dockerfile .
+docker push 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-pipeline:latest
+aws lambda update-function-code \
+  --function-name triageai-pipeline \
+  --image-uri 177884821405.dkr.ecr.us-east-1.amazonaws.com/triageai-pipeline:latest \
+  --region us-east-1
 ```
 
 **Critical:** `NEXT_PUBLIC_*` variables in Next.js are baked into the JS bundle at build time — they cannot be injected at runtime. Always pass them as `--build-arg` when building the frontend image.
@@ -293,12 +263,12 @@ This is a **safety requirement** — wrong action field silently drops urgent pa
 ### Pre-production checklist (must complete before real PHI)
 - [x] Real JWT verification (Cognito) — implemented
 - [x] RDS encryption at rest — enabled
-- [x] App Runner + ECR deployment
-- [ ] Set `ALLOWED_ORIGINS` to production domain only (remove localhost)
+- [x] ECS + Lambda deployment on ECR
 - [x] Configure RDS to reject non-SSL connections — `rds.force_ssl=1` in custom param group `triageai-postgres16`, `sslmode=require` in all client URLs
+- [x] HTTPS enforced — TLS 1.3 on ALB, HTTP→HTTPS redirect
+- [ ] Set `ALLOWED_ORIGINS` to production domain only (remove localhost) — update ECS task definition env
 - [ ] Set up CloudWatch log groups with no PHI logging policy
 - [ ] Enable RDS automated backups with 6-year retention
-- [ ] Confirm AWS BAA covers App Runner (verify in AWS console)
 - [ ] Penetration test before go-live
 
 ---
