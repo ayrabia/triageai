@@ -8,6 +8,7 @@ import { getReferral, getPdfUrl } from '@/lib/api'
 import PriorityBadge from '@/components/PriorityBadge'
 import ActionButtons from '@/components/ActionButtons'
 import RouteModal from '@/components/RouteModal'
+import PhysicianResponsePanel from '@/components/PhysicianResponsePanel'
 import { ACTION_CONFIG, STATUS_CONFIG, formatDateTime, formatRelativeTime } from '@/lib/utils'
 import type { ReferralDetail } from '@/lib/types'
 
@@ -296,11 +297,67 @@ export default function ReferralDetailPage({ params }: Props) {
               <ActionButtons
                 referralId={referral.id}
                 currentStatus={referral.status}
+                currentAction={referral.action}
                 token={user!.idToken}
                 userRole={user!.role}
                 onRouteClick={() => setRouteModalOpen(true)}
               />
             </section>
+
+            {/* MD Decision panel — PHYSICIAN responds when escalated to them */}
+            {user!.role === 'physician'
+              && referral.status === 'escalated_to_md'
+              && referral.routed_to === user!.id && (
+              <PhysicianResponsePanel
+                referralId={referral.id}
+                token={user!.idToken}
+                onSuccess={() => getReferral(params.id, user!.idToken).then(setReferral)}
+              />
+            )}
+
+            {/* MD Decision result — REVIEWER sees physician's decision */}
+            {(user!.role === 'reviewer' || user!.role === 'admin')
+              && referral.status === 'md_reviewed'
+              && (referral.physician_note || referral.scheduling_window) && (
+              <section className="bg-primary-fixed/5 border border-primary-container/20 rounded-lg p-5">
+                <h2 className="text-sm font-semibold text-primary uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>medical_services</span>
+                  MD Decision
+                  {referral.routed_to_name && (
+                    <span className="text-xs font-normal text-on-surface-variant normal-case tracking-normal">
+                      — {referral.routed_to_name}
+                    </span>
+                  )}
+                </h2>
+                {referral.scheduling_window && (
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-primary mb-3">
+                    <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>calendar_today</span>
+                    {referral.scheduling_window}
+                  </div>
+                )}
+                {referral.physician_note && (
+                  <p className="text-sm leading-relaxed text-on-surface">{referral.physician_note}</p>
+                )}
+              </section>
+            )}
+
+            {/* Scheduling window — COORDINATOR sees when ready to schedule */}
+            {user!.role === 'coordinator'
+              && referral.status === 'approved_for_scheduling'
+              && referral.scheduling_window && (
+              <section className="bg-primary-fixed/5 border border-primary-container/20 rounded-lg p-5">
+                <h2 className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider mb-3">
+                  Scheduling Window
+                </h2>
+                <div className="flex items-center gap-1.5 text-sm font-medium text-primary">
+                  <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>calendar_today</span>
+                  {referral.scheduling_window}
+                </div>
+                {referral.physician_note && (
+                  <p className="mt-2 text-sm text-on-surface-variant leading-relaxed">{referral.physician_note}</p>
+                )}
+              </section>
+            )}
           </div>
         </div>
 

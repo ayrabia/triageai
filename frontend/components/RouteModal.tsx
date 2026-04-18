@@ -63,8 +63,8 @@ export default function RouteModal({ referralId, token, isOpen, onClose, onRoute
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-outline-variant/15">
           <div>
-            <h2 className="text-base font-bold tracking-tight text-on-surface">Route to Physician</h2>
-            <p className="text-xs text-on-surface-variant mt-0.5">Select the physician for this referral</p>
+            <h2 className="text-base font-bold tracking-tight text-on-surface">Escalate to MD</h2>
+            <p className="text-xs text-on-surface-variant mt-0.5">Select the MD on triage for this referral</p>
           </div>
           <button
             onClick={onClose}
@@ -126,7 +126,7 @@ export default function RouteModal({ referralId, token, isOpen, onClose, onRoute
             disabled={!selected || loading}
             className="px-4 py-2 text-sm font-medium bg-primary text-on-primary rounded hover:bg-primary-container transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {loading ? 'Routing…' : selectedPhysician ? `Route to ${selectedPhysician.name.split(' ')[0]}` : 'Route'}
+            {loading ? 'Escalating…' : selectedPhysician ? `Escalate to ${selectedPhysician.name.split(' ')[0]}` : 'Escalate'}
           </button>
         </div>
       </div>

@@ -1,8 +1,9 @@
 /**
  * POST /api/referrals/[id]/route
  *
- * Routes a referral to a physician. Restricted to COORDINATOR and ADMIN roles.
- * Sets status → 'routed', records routed_to and routed_at.
+ * REVIEWER escalates a referral to the MD on triage.
+ * Sets status → 'escalated_to_md', records routed_to (physician), escalated_by (reviewer).
+ * Restricted to REVIEWER and ADMIN.
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -17,7 +18,7 @@ export async function POST(
 ) {
   try {
     const user = await withAuth(request)
-    requireRole(user, 'coordinator', 'admin')
+    requireRole(user, 'reviewer', 'admin')
 
     const { id } = params
     const { physician_id } = await request.json() as { physician_id?: string }
@@ -26,12 +27,11 @@ export async function POST(
       throw new ApiError(400, 'physician_id is required')
     }
 
-    // Verify the target physician exists and belongs to the same clinic
     const physicianRows = await sql`
       SELECT id FROM users
       WHERE id = ${physician_id}
         AND clinic_id = ${user.clinic_id}
-        AND role = 'physician'
+        AND LOWER(role) = 'physician'
       LIMIT 1
     `
 
@@ -39,7 +39,6 @@ export async function POST(
       throw new ApiError(404, 'Physician not found in your clinic')
     }
 
-    // Verify the referral belongs to the same clinic
     const referralRows = await sql`
       SELECT id, clinic_id, status, routed_to
       FROM referrals
@@ -55,9 +54,10 @@ export async function POST(
 
     await sql`
       UPDATE referrals
-      SET status    = 'routed',
-          routed_to = ${physician_id},
-          routed_at = NOW()
+      SET status       = 'escalated_to_md',
+          routed_to    = ${physician_id},
+          routed_at    = NOW(),
+          escalated_by = ${user.id}
       WHERE id = ${id}
     `
 
@@ -65,9 +65,9 @@ export async function POST(
     await writeAuditLog(
       id,
       user.id,
-      'routed_to_physician',
+      'escalated_to_physician',
       { status: referral.status, routed_to: referral.routed_to },
-      { status: 'routed', routed_to: physician_id },
+      { status: 'escalated_to_md', routed_to: physician_id, escalated_by: user.id },
       ip,
     )
 

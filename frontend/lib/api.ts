@@ -1,6 +1,5 @@
 import type { Physician, ReferralDetail, ReferralStatus, ReferralSummary } from './types'
 
-// All calls go through the Next.js proxy (/api/* → FastAPI)
 const BASE = '/api'
 
 function authHeaders(token: string): HeadersInit {
@@ -73,14 +72,31 @@ export async function updateStatus(
   id: string,
   status: ReferralStatus,
   token: string,
-): Promise<ReferralDetail> {
+  extra?: { scheduling_window?: string },
+): Promise<{ ok: boolean }> {
   const res = await fetch(`${BASE}/referrals/${id}/status`, {
     method: 'PATCH',
     headers: authHeaders(token),
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, ...extra }),
   })
   if (res.status === 401) throw new Error('UNAUTHORIZED')
   if (!res.ok) throw new Error(`Failed to update status: ${res.status}`)
+  return res.json()
+}
+
+export async function respondToReferral(
+  id: string,
+  data: { physician_note: string; scheduling_window: string },
+  token: string,
+): Promise<{ ok: boolean }> {
+  const res = await fetch(`${BASE}/referrals/${id}/respond`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: JSON.stringify(data),
+  })
+  if (res.status === 401) throw new Error('UNAUTHORIZED')
+  if (res.status === 403) throw new Error('FORBIDDEN')
+  if (!res.ok) throw new Error(`Failed to submit response: ${res.status}`)
   return res.json()
 }
 
@@ -98,7 +114,7 @@ export async function routeReferral(
   id: string,
   physicianId: string,
   token: string,
-): Promise<ReferralDetail> {
+): Promise<{ ok: boolean }> {
   const res = await fetch(`${BASE}/referrals/${id}/route`, {
     method: 'POST',
     headers: authHeaders(token),
@@ -106,6 +122,6 @@ export async function routeReferral(
   })
   if (res.status === 401) throw new Error('UNAUTHORIZED')
   if (res.status === 403) throw new Error('FORBIDDEN')
-  if (!res.ok) throw new Error(`Failed to route referral: ${res.status}`)
+  if (!res.ok) throw new Error(`Failed to escalate referral: ${res.status}`)
   return res.json()
 }

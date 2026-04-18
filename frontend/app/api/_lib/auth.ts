@@ -96,7 +96,7 @@ export async function withAuth(request: NextRequest): Promise<DbUser> {
   }
 
   const rows = await sql<DbUser[]>`
-    SELECT id, clinic_id, auth_provider_id, role, name, email
+    SELECT id, clinic_id, auth_provider_id, LOWER(role) AS role, name, email
     FROM users
     WHERE auth_provider_id = ${sub}
     LIMIT 1

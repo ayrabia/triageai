@@ -20,10 +20,12 @@ export async function GET(
       SELECT
         r.*,
         u_reviewed.name   AS reviewed_by_name,
-        u_routed.name     AS routed_to_name
+        u_routed.name     AS routed_to_name,
+        u_escalated.name  AS escalated_by_name
       FROM referrals r
-      LEFT JOIN users u_reviewed ON u_reviewed.id = r.reviewed_by
-      LEFT JOIN users u_routed   ON u_routed.id   = r.routed_to
+      LEFT JOIN users u_reviewed  ON u_reviewed.id  = r.reviewed_by
+      LEFT JOIN users u_routed    ON u_routed.id    = r.routed_to
+      LEFT JOIN users u_escalated ON u_escalated.id = r.escalated_by
       WHERE r.id = ${id}
         AND r.clinic_id = ${user.clinic_id}
       LIMIT 1

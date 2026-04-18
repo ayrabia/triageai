@@ -3,12 +3,17 @@ import enum
 
 class ReferralStatus(str, enum.Enum):
     PENDING = "pending"
-    FAILED = "failed"       # pipeline error — needs manual review
+    FAILED = "failed"
+    READY = "ready"
     REVIEWED = "reviewed"
     APPROVED = "approved"
     ESCALATED = "escalated"
+    ESCALATED_TO_MD = "escalated_to_md"
+    MD_REVIEWED = "md_reviewed"
+    APPROVED_FOR_SCHEDULING = "approved_for_scheduling"
+    SCHEDULED = "scheduled"
     ARCHIVED = "archived"
-    ROUTED = "routed"       # routed to a physician by a coordinator
+    ROUTED = "routed"
 
 
 class ReferralAction(str, enum.Enum):

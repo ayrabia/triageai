@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       SELECT
         id, clinic_id, status, action, filename,
         referral_reason, summary, recommended_window,
+        scheduling_window, physician_note,
         missing_information, received_at, processed_at, routed_to
       FROM referrals
       WHERE clinic_id = ${user.clinic_id}

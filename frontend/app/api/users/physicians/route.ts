@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     const physicians = await sql`
       SELECT id, name, email
       FROM users
-      WHERE clinic_id = ${user.clinic_id} AND role = 'physician'
+      WHERE clinic_id = ${user.clinic_id} AND LOWER(role) = 'physician'
       ORDER BY name ASC
     `
 

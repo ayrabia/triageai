@@ -6,9 +6,14 @@ export type ReferralAction =
 export type ReferralStatus =
   | 'pending'
   | 'failed'
+  | 'ready'
   | 'reviewed'
   | 'approved'
   | 'escalated'
+  | 'escalated_to_md'
+  | 'md_reviewed'
+  | 'approved_for_scheduling'
+  | 'scheduled'
   | 'archived'
   | 'routed'
 
@@ -32,6 +37,7 @@ export interface ReferralSummary {
   referral_reason: string | null
   summary: string | null
   recommended_window: string | null
+  scheduling_window: string | null
   missing_information: string[] | null
   received_at: string
   processed_at: string | null
@@ -44,6 +50,7 @@ export interface ReferralDetail {
   s3_key: string
   status: ReferralStatus
   action: ReferralAction | null
+  filename: string | null
   referral_reason: string | null
   relevant_clinical_findings: string[] | null
   imaging_summary: string | null
@@ -55,6 +62,10 @@ export interface ReferralDetail {
   provider_label: string | null
   reasoning: string | null
   recommended_window: string | null
+  scheduling_window: string | null
+  physician_note: string | null
+  escalated_by: string | null
+  escalated_by_name: string | null
   next_steps: string | null
   summary: string | null
   model_used: string | null
@@ -64,7 +75,9 @@ export interface ReferralDetail {
   processed_at: string | null
   reviewed_at: string | null
   reviewed_by: string | null
+  reviewed_by_name: string | null
   routed_to: string | null
+  routed_to_name: string | null
   routed_at: string | null
   created_at: string
 }

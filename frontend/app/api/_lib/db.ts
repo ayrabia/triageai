@@ -46,7 +46,10 @@ function getPool(): ReturnType<typeof postgres> {
  * Tagged template literal proxy — forwards all operations to the lazily-created pool.
  * Usage is identical to a direct `postgres` instance: sql`SELECT ...`
  */
-export const sql: ReturnType<typeof postgres> = new Proxy({} as ReturnType<typeof postgres>, {
+// Target must be a function — Proxy apply trap only fires if target is callable
+function _sqlStub() {}
+
+export const sql: ReturnType<typeof postgres> = new Proxy(_sqlStub as unknown as ReturnType<typeof postgres>, {
   get(_target, prop) {
     const pool = getPool()
     const value = (pool as unknown as Record<string | symbol, unknown>)[prop]
@@ -88,6 +91,9 @@ export interface DbReferral {
   provider_label: string | null
   reasoning: string | null
   recommended_window: string | null
+  scheduling_window: string | null
+  physician_note: string | null
+  escalated_by: string | null
   next_steps: string | null
   summary: string | null
   model_used: string | null

@@ -26,11 +26,11 @@ export function formatDate(iso: string): string {
 export const ACTION_CONFIG: Record<ReferralAction, {
   label: string
   shortLabel: string
-  borderColor: string  // border-l-[color] class for 3px left accent
-  badgeBg: string      // badge background class
-  badgeText: string    // badge text class
-  sectionBg: string    // subtle inset section background
-  dotColor: string     // dot indicator class
+  borderColor: string
+  badgeBg: string
+  badgeText: string
+  sectionBg: string
+  dotColor: string
 }> = {
   'PRIORITY REVIEW': {
     label: 'Priority Review',
@@ -62,11 +62,16 @@ export const ACTION_CONFIG: Record<ReferralAction, {
 }
 
 export const STATUS_CONFIG: Record<ReferralStatus, { label: string; color: string }> = {
-  pending:   { label: 'Pending',   color: 'text-on-surface-variant bg-surface-container-high' },
-  failed:    { label: 'Failed',    color: 'text-on-error bg-error' },
-  reviewed:  { label: 'Reviewed',  color: 'text-on-secondary-container bg-secondary-container' },
-  approved:  { label: 'Approved',  color: 'text-on-primary bg-primary-container' },
-  escalated: { label: 'Escalated', color: 'text-on-tertiary bg-tertiary-container' },
-  archived:  { label: 'Archived',  color: 'text-outline bg-surface-container-high' },
-  routed:    { label: 'Routed',    color: 'text-primary bg-primary-fixed/30' },
+  pending:                 { label: 'Pending',            color: 'text-on-surface-variant bg-surface-container-high' },
+  failed:                  { label: 'Failed',             color: 'text-on-error bg-error' },
+  ready:                   { label: 'Ready',              color: 'text-on-surface-variant bg-surface-container-high' },
+  reviewed:                { label: 'Reviewed',           color: 'text-on-secondary-container bg-secondary-container' },
+  approved:                { label: 'Approved',           color: 'text-on-primary bg-primary-container' },
+  escalated:               { label: 'Escalated',          color: 'text-on-tertiary bg-tertiary-container' },
+  escalated_to_md:         { label: 'Awaiting MD',        color: 'text-on-surface border border-outline-variant/30 bg-surface-container-high' },
+  md_reviewed:             { label: 'MD Responded',       color: 'text-primary bg-primary-fixed/30' },
+  approved_for_scheduling: { label: 'Ready to Schedule',  color: 'text-on-primary-container bg-primary-container' },
+  scheduled:               { label: 'Scheduled',          color: 'text-on-secondary-container bg-secondary-container' },
+  archived:                { label: 'Archived',           color: 'text-outline bg-surface-container-high' },
+  routed:                  { label: 'Routed',             color: 'text-primary bg-primary-fixed/30' },
 }
