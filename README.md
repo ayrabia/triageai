@@ -49,7 +49,8 @@ TriageAI ingests faxed referrals, extracts clinical information using Claude via
 
 - **POC validated** on 6 real de-identified ENT referrals from Sacramento ENT — 0 missed urgents, 0 silent downgrades
 - **Fully deployed on AWS** — ECS Fargate (frontend) + Lambda (pipeline), RDS, S3, Bedrock, Cognito
-- **Live at** [app.usetriageai.com](https://app.usetriageai.com)
+- **Clinic portals live** — each clinic gets its own subdomain (e.g. `sacent.usetriageai.com`) with isolated auth enforcement
+- **Full role system implemented** — COORDINATOR, REVIEWER, PHYSICIAN, ADMIN with a complete scheduling workflow
 - **Awaiting clinical validation** from Nadia Rabia (Referral Coordinator, SacENT)
 - Pre-seed / concept stage
 
@@ -63,6 +64,51 @@ TriageAI ingests faxed referrals, extracts clinical information using Claude via
 | R04 | Nasal fracture (delayed healing) | PRIORITY REVIEW ✓ |
 | R05 | Tonsillar cyst/polyp | SECONDARY APPROVAL ✓ |
 | R06 | Pediatric recurrent otitis media | SECONDARY APPROVAL ✓ (after bug fix) |
+
+---
+
+## Role System
+
+TriageAI maps directly to how specialty clinic triage teams actually work:
+
+| Role | Who | What they do |
+|------|-----|-------------|
+| **COORDINATOR** | Scheduling staff | Upload referrals from the fax folder; confirm scheduling once a window is set |
+| **REVIEWER** | APPs + Clinical Managers | Review AI-classified referrals; approve for scheduling (with window) or escalate to MD |
+| **PHYSICIAN** | MD on triage rotation | Receive escalated high-acuity cases; set scheduling window + clinical decision notes |
+| **ADMIN** | System admin | Full access across all views and actions |
+
+### Permissions
+
+| Ability | COORDINATOR | REVIEWER | PHYSICIAN | ADMIN |
+|---------|:-----------:|:--------:|:---------:|:-----:|
+| Upload referral PDFs | ✓ | | | ✓ |
+| View Priority queue | | ✓ | | ✓ |
+| View Secondary queue | | ✓ | | ✓ |
+| View Standard queue | | ✓ | | ✓ |
+| Approve referral for scheduling (set window) | | ✓ | | ✓ |
+| Escalate referral to MD (Priority Review only) | | ✓ | | ✓ |
+| View My Queue (escalated referrals assigned to me) | | | ✓ | |
+| View All Cases | | | ✓ | ✓ |
+| Submit MD decision (scheduling window + clinical note) | | | ✓ | ✓ |
+| Confirm referral as scheduled | ✓ | | | ✓ |
+| View Scheduling Inbox (approved, awaiting confirmation) | ✓ | | | ✓ |
+| Archive / dismiss failed referrals | ✓ | ✓ | ✓ | ✓ |
+| View audit trail | ✓ | ✓ | ✓ | ✓ |
+| View referral detail + PDF | ✓ | ✓ | ✓ | ✓ |
+| Full access across all views and actions | | | | ✓ |
+
+### Workflow
+
+```
+Fax arrives → COORDINATOR uploads PDF
+  → AI classifies (PRIORITY / SECONDARY / STANDARD)
+  → REVIEWER triages:
+      Standard/Secondary → pick window → Approve for Scheduling → COORDINATOR confirms
+      Priority Review    → Escalate to MD
+        → PHYSICIAN reviews → sets window + note → MD decision returned
+          → REVIEWER sends to scheduler → COORDINATOR confirms
+```
 
 ---
 
@@ -86,9 +132,13 @@ TriageAI ingests faxed referrals, extracts clinical information using Claude via
 
 ---
 
-## Production URL
+## Production URLs
 
-**[https://app.usetriageai.com](https://app.usetriageai.com)**
+| Subdomain | Purpose |
+|-----------|---------|
+| `sacent.usetriageai.com` | Sacramento ENT clinic portal |
+| `{slug}.usetriageai.com` | Any future clinic — DNS wildcard already live |
+| `app.usetriageai.com` | Redirects to `/clinic-portal` (use your clinic's subdomain) |
 
 ---
 
@@ -137,16 +187,11 @@ npm install
 #   COGNITO_APP_CLIENT_ID=5ln3morakigit80ae0m8i295qb
 #   NEXT_PUBLIC_COGNITO_REGION=us-east-1
 #   NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=5ln3morakigit80ae0m8i295qb
+#   PIPELINE_SECRET=<secret>
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
-
-### Run Tests
-
-```bash
-pytest classifier/test_classifier.py -v
-```
 
 ---
 
@@ -203,7 +248,7 @@ triageai/
 │   └── session.py                         # DB engine + session factory
 │
 ├── alembic/
-│   └── versions/                          # DB migration files
+│   └── versions/                          # DB migration files (0001–0005)
 │
 ├── pipeline/
 │   ├── run.py                             # process_referral() — called by Lambda
@@ -218,6 +263,7 @@ triageai/
 │
 ├── frontend/
 │   ├── Dockerfile                         # Next.js standalone container
+│   ├── middleware.ts                       # Subdomain → x-clinic-slug header
 │   ├── next.config.mjs
 │   ├── app/
 │   │   ├── page.tsx                       # Home dashboard (role-aware)
@@ -225,22 +271,25 @@ triageai/
 │   │   ├── secondary/page.tsx
 │   │   ├── standard/page.tsx
 │   │   ├── pending/page.tsx               # In-pipeline / failed referrals
-│   │   ├── my-queue/page.tsx              # Physician: assigned referrals
+│   │   ├── scheduling-inbox/page.tsx      # COORDINATOR: ready-to-schedule list
+│   │   ├── clinic-portal/page.tsx         # app. subdomain redirect target
+│   │   ├── my-queue/page.tsx              # Physician: escalated referrals
 │   │   ├── all-cases/page.tsx             # Physician: all clinic referrals
-│   │   ├── referrals/[id]/page.tsx        # Referral detail + PDF viewer
+│   │   ├── referrals/[id]/page.tsx        # Referral detail + PDF viewer + MD panel
 │   │   ├── login/page.tsx
 │   │   └── api/                           # Route Handlers (all API endpoints)
 │   │       ├── _lib/
 │   │       │   ├── db.ts                  # postgres pool (lazy singleton)
-│   │       │   └── auth.ts                # Cognito JWT + withAuth()
+│   │       │   └── auth.ts                # Cognito JWT + withAuth() + clinic isolation
 │   │       ├── referrals/
 │   │       │   ├── route.ts               # GET queue
 │   │       │   ├── upload/route.ts        # POST upload → S3 + DB
 │   │       │   ├── ingest/route.ts        # POST pipeline callback
 │   │       │   └── [id]/
 │   │       │       ├── route.ts           # GET detail
-│   │       │       ├── status/route.ts    # PATCH status
-│   │       │       ├── route/route.ts     # POST route to physician
+│   │       │       ├── status/route.ts    # PATCH status transitions
+│   │       │       ├── route/route.ts     # POST escalate to MD (REVIEWER)
+│   │       │       ├── respond/route.ts   # POST MD decision (PHYSICIAN)
 │   │       │       ├── pdf/route.ts       # GET presigned S3 URL
 │   │       │       └── audit/route.ts     # GET audit trail
 │   │       └── users/
@@ -250,12 +299,13 @@ triageai/
 │   │   ├── TierQueue.tsx
 │   │   ├── PendingQueue.tsx
 │   │   ├── QueueCard.tsx
-│   │   ├── RouteModal.tsx
-│   │   ├── ActionButtons.tsx
+│   │   ├── RouteModal.tsx                 # Physician selection modal (REVIEWER escalation)
+│   │   ├── ActionButtons.tsx              # Role-aware triage actions
+│   │   ├── PhysicianResponsePanel.tsx     # MD decision form
 │   │   └── UploadZone.tsx
 │   └── lib/
 │       ├── api.ts
-│       ├── auth.ts
+│       ├── auth.tsx
 │       ├── types.ts
 │       └── utils.ts
 │
@@ -267,21 +317,22 @@ triageai/
 
 ## API Endpoints
 
-All served by Next.js Route Handlers at `app.usetriageai.com/api/`:
+All served by Next.js Route Handlers at `{clinic}.usetriageai.com/api/`:
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/referrals` | Paginated queue sorted by priority tier |
-| `POST` | `/api/referrals/upload` | PDF upload → S3 + DB row |
-| `POST` | `/api/referrals/ingest` | Pipeline callback (PIPELINE_SECRET auth) |
-| `GET` | `/api/referrals/[id]` | Full referral detail + audit log write |
-| `PATCH` | `/api/referrals/[id]/status` | Status transition |
-| `POST` | `/api/referrals/[id]/route` | Route to physician (coordinator/admin only) |
-| `GET` | `/api/referrals/[id]/pdf` | Presigned S3 URL (5 min TTL) |
-| `GET` | `/api/referrals/[id]/audit` | HIPAA audit trail |
-| `GET` | `/api/users/me` | Authenticated user profile |
-| `GET` | `/api/users/physicians` | Physicians at caller's clinic |
-| `GET` | `/api/health` | Health check |
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/referrals` | Any | Paginated queue sorted by priority tier |
+| `POST` | `/api/referrals/upload` | Any | PDF upload → S3 + DB row |
+| `POST` | `/api/referrals/ingest` | PIPELINE_SECRET | Pipeline callback |
+| `GET` | `/api/referrals/[id]` | Any | Full referral detail + audit log write |
+| `PATCH` | `/api/referrals/[id]/status` | Any | Status transition |
+| `POST` | `/api/referrals/[id]/route` | REVIEWER / ADMIN | Escalate to MD (physician selection) |
+| `POST` | `/api/referrals/[id]/respond` | PHYSICIAN / ADMIN | MD decision (window + note) |
+| `GET` | `/api/referrals/[id]/pdf` | Any | Presigned S3 URL (5 min TTL) |
+| `GET` | `/api/referrals/[id]/audit` | Any | HIPAA audit trail |
+| `GET` | `/api/users/me` | Any | Authenticated user profile |
+| `GET` | `/api/users/physicians` | Any | Physicians at caller's clinic |
+| `GET` | `/api/health` | None | Health check |
 
 ---
 
@@ -295,8 +346,8 @@ TriageAI is designed for HIPAA compliance from day one:
 - **Append-only audit trail** — every view, status change, and PDF access is logged
 - **6-year backup retention** via AWS Backup (HIPAA requirement)
 - **RDS SSL enforced** — `rds.force_ssl=1`, all clients use `sslmode=require`
-- Role-based access control — ADMIN, COORDINATOR, PHYSICIAN roles
-- Multi-clinic data isolation enforced at the query level (`clinic_id` scoping)
+- Role-based access control — COORDINATOR, REVIEWER, PHYSICIAN, ADMIN
+- Multi-clinic data isolation enforced at query level (`clinic_id` scoping) and subdomain level (`x-clinic-slug` middleware)
 
 > **Important:** TriageAI is an **administrative workflow tool**, not a clinical decision support system. The AI surfaces information — triage staff make all final decisions.
 
@@ -323,21 +374,25 @@ TriageAI is designed for HIPAA compliance from day one:
 - [x] Three-tier classification (Priority / Secondary / Standard)
 - [x] v3 pipeline validated on 6 de-identified ENT referrals
 - [x] PostgreSQL schema + Alembic migrations
-- [x] Next.js Route Handlers — full API (queue, upload, detail, status, routing, audit, PDF)
-- [x] Next.js frontend — per-tier pages, urgency-first cards, filename display, in-pipeline queue
+- [x] Next.js Route Handlers — full API
+- [x] Next.js frontend — per-tier pages, urgency-first cards, in-pipeline queue
 - [x] Drag-and-drop PDF upload with live status tracking
 - [x] AWS Cognito authentication (JWT)
 - [x] AWS RDS production database (encrypted at rest, SSL enforced)
 - [x] Lambda pipeline — S3 trigger, automatic classification on upload
-- [x] ECS Fargate + ALB — live at app.usetriageai.com (HTTPS, TLS 1.3)
-- [x] Physician role + referral routing workflow
+- [x] ECS Fargate + ALB — HTTPS, TLS 1.3
 - [x] 6-year HIPAA backup retention (AWS Backup)
+- [x] Subdomain-based clinic portals with auth isolation (`sacent.usetriageai.com`)
+- [x] Full role system — COORDINATOR, REVIEWER, PHYSICIAN, ADMIN
+- [x] Complete scheduling workflow — escalation → MD decision → scheduler → confirmed
 - [ ] Clinical validation — Nadia Rabia (SacENT)
-- [ ] Provision first physician account for end-to-end routing test
 - [ ] Phaxio fax ingestion
+- [ ] Clinic branding on portal login page
+- [ ] Clinic onboarding automation (currently manual)
+- [ ] CloudWatch no-PHI logging policy
+- [ ] Penetration test before go-live with real PHI
 - [ ] Cardiology specialty criteria
 - [ ] Orthopedics specialty criteria
-- [ ] Multi-clinic onboarding
 
 ---
 
