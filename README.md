@@ -342,10 +342,31 @@ The following must be completed before any real patient data is processed:
 
 | Blocker | Status | Notes |
 |---------|--------|-------|
-| CloudWatch no-PHI logging policy | ⛔ Open | Log groups need an explicit policy preventing PHI from appearing in CloudWatch. Structured logs currently emit only UUIDs/enums, but a formal policy must be attached to the log groups before go-live. |
+| CloudWatch no-PHI logging policy | ✅ Complete | Retention set on all log groups (April 2026). Code audit confirmed no PHI in logs — see details below. |
 | Penetration test | ⛔ Open | Full external pentest required before processing real patient data. Must cover auth bypass, subdomain isolation, S3 access, and API authorization boundaries. |
 
-> These are hard blockers — **do not process real PHI until both are resolved.**
+> Do not process real PHI until the penetration test is complete.
+
+### CloudWatch Logging Policy (completed April 2026)
+
+**Retention policies applied:**
+
+| Log Group | Retention | Notes |
+|-----------|-----------|-------|
+| `/aws/lambda/triageai-pipeline` | 365 days | Active — Lambda pipeline |
+| `/ecs/triageai-frontend` | 365 days | Active — ECS Next.js frontend |
+| `/aws/apprunner/triageai-*` | 30 days | Decommissioned App Runner (expiring) |
+| `/aws/lambda/triageai-check-db` | 30 days | Temp migration Lambda (expiring) |
+| `/aws/lambda/triageai-cleanup` | 30 days | Temp migration Lambda (expiring) |
+| `/aws/lambda/triageai-migrate-onboarding` | 30 days | Temp migration Lambda (expiring) |
+
+**Code audit results — no PHI in logs:**
+
+- `pipeline/run.py` — zero print or logging statements. Lambda runs silently; only AWS-managed invocation metadata is written to CloudWatch.
+- `frontend/app/api/_lib/auth.ts` — one `console.error` on unhandled 500s, logs `err.message` only (e.g. "Connection refused"). Never logs request bodies, headers, or any user/patient data.
+- `pipeline/pipeline_test_v2.py` — contains print statements that output clinical content, but this is a **local evaluation script only** and is never deployed to Lambda.
+
+**What logs do contain:** Lambda invocation metadata (duration, memory, request ID), HTTP method + path + status code, and generic error messages. No patient names, DOBs, referral content, S3 keys, or any other PHI.
 
 ---
 
