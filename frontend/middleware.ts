@@ -7,15 +7,7 @@ export function middleware(request: NextRequest) {
   const host = (request.headers.get('host') ?? '').split(':')[0]
   const subdomain = getSubdomain(host)
 
-  if (subdomain === 'app') {
-    const pathname = request.nextUrl.pathname
-    if (pathname === CLINIC_PORTAL_PATH || pathname.startsWith('/api/')) return NextResponse.next()
-    const url = request.nextUrl.clone()
-    url.hostname = url.hostname.replace(/^app\./, 'sacent.')
-    return NextResponse.redirect(url, 302)
-  }
-
-  if (!subdomain || NON_CLINIC_SUBDOMAINS.has(subdomain)) return NextResponse.next()
+  if (!subdomain || NON_CLINIC_SUBDOMAINS.has(subdomain) || subdomain === 'app') return NextResponse.next()
 
   const headers = new Headers(request.headers)
   headers.set('x-clinic-slug', subdomain)

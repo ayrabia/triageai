@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM public.ecr.aws/docker/library/node:18-alpine AS builder
 WORKDIR /app
 
 COPY package*.json ./
@@ -19,7 +19,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # ---- runtime image ----
-FROM node:18-alpine AS runner
+FROM public.ecr.aws/docker/library/node:18-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production

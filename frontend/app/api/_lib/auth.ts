@@ -96,7 +96,7 @@ export async function withAuth(request: NextRequest): Promise<DbUser> {
   }
 
   const rows = await sql<DbUser[]>`
-    SELECT id, clinic_id, auth_provider_id, LOWER(role) AS role, name, email
+    SELECT id, clinic_id, auth_provider_id, LOWER(role) AS role, name, email, is_active
     FROM users
     WHERE auth_provider_id = ${sub}
     LIMIT 1
@@ -107,6 +107,13 @@ export async function withAuth(request: NextRequest): Promise<DbUser> {
   }
 
   const user = rows[0]
+
+  if (!user.is_active) {
+    throw new ApiError(403, 'Your account has been deactivated — contact your administrator')
+  }
+
+  // Superadmins are platform-wide — skip subdomain clinic isolation check
+  if (user.role === 'superadmin') return user
 
   // Enforce subdomain → clinic isolation: reject users whose account belongs
   // to a different clinic than the portal they're accessing.

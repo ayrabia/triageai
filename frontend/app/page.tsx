@@ -67,7 +67,7 @@ function countAll(referrals: ReferralSummary[], myUserId?: string) {
     processing:           referrals.filter((r) => r.status === 'pending' && !r.action).length,
     failed:               referrals.filter((r) => r.status === 'failed').length,
     myQueue:              myUserId ? referrals.filter((r) => r.routed_to === myUserId).length : 0,
-    total:                referrals.filter((r) => r.status !== 'archived').length,
+    total:                active.length,
   }
 }
 
@@ -99,6 +99,7 @@ export default function HomePage() {
   useEffect(() => {
     if (authLoading) return
     if (!user) { router.replace('/login'); return }
+    if (user.role === 'superadmin') { router.replace('/superadmin'); return }
     fetchQueue()
     const interval = setInterval(fetchQueue, POLL_INTERVAL_MS)
     return () => clearInterval(interval)
@@ -124,17 +125,16 @@ export default function HomePage() {
         <div className="mx-auto max-w-4xl px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <span className="text-xl font-black uppercase tracking-tighter text-primary">TriageAI</span>
-            <div className="hidden sm:block h-5 w-px bg-outline-variant/40" />
-            <div className="hidden sm:flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-sm font-medium text-on-surface-variant">Live</span>
-              <span className="bg-surface-container-high text-on-surface-variant px-2 py-0.5 rounded text-xs ml-1">
-                {total} referral{total !== 1 ? 's' : ''}
-              </span>
-            </div>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-on-surface-variant">{user.clinicName}</span>
+            {role === 'admin' && (
+              <Link href="/team"
+                className="text-xs font-medium text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1">
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>group</span>
+                Team
+              </Link>
+            )}
             <button
               onClick={() => { logout(); router.replace('/login') }}
               className="bg-surface-container-low border border-outline-variant/30 text-on-surface-variant text-xs font-medium px-3 py-1.5 rounded hover:bg-surface-container-high transition-colors"

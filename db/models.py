@@ -85,10 +85,10 @@ class Referral(Base):
     # Original filename from the upload or fax system
     filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    status: Mapped[ReferralStatus] = mapped_column(
-        SAEnum(ReferralStatus, native_enum=False),
+    status: Mapped[str] = mapped_column(
+        String(50),
         nullable=False,
-        default=ReferralStatus.PENDING,
+        default=ReferralStatus.PENDING.value,
     )
 
     # --- Pipeline output: extraction fields ---
@@ -104,9 +104,7 @@ class Referral(Base):
     provider_urgency_label: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     # --- Pipeline output: classification fields ---
-    action: Mapped[ReferralAction | None] = mapped_column(
-        SAEnum(ReferralAction, native_enum=False), nullable=True
-    )
+    action: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # ["Confirmed or suspected cancer / malignancy"]
     matched_criteria: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     # ["exact text from document that triggered the match"]

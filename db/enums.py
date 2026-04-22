@@ -23,6 +23,7 @@ class ReferralAction(str, enum.Enum):
 
 
 class UserRole(str, enum.Enum):
+    SUPERADMIN = "superadmin"
     ADMIN = "admin"
     COORDINATOR = "coordinator"
     REVIEWER = "reviewer"

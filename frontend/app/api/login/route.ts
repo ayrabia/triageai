@@ -29,12 +29,19 @@ export async function POST(req: NextRequest) {
   if (!cognitoRes.ok) {
     const type = data.__type ?? ''
     const message =
-      type === 'NotAuthorizedException'
-        ? 'Incorrect email or password.'
-        : type === 'UserNotFoundException'
-        ? 'No account found with that email.'
-        : 'Login failed. Please try again.'
+      type === 'NotAuthorizedException' ? 'Incorrect email or password.' :
+      type === 'UserNotFoundException'  ? 'No account found with that email.' :
+      'Login failed. Please try again.'
     return NextResponse.json({ error: message }, { status: 401 })
+  }
+
+  // Invited users must set a new password on first login
+  if (data.ChallengeName === 'NEW_PASSWORD_REQUIRED') {
+    return NextResponse.json({
+      challenge: 'NEW_PASSWORD_REQUIRED',
+      session: data.Session,
+      email,
+    })
   }
 
   const idToken: string = data.AuthenticationResult.IdToken

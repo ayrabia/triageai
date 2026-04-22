@@ -4,7 +4,7 @@
  * Auth context for TriageAI.
  *
  * Login calls the Next.js /api/login route (Cognito server-side, no CORS).
- * Tokens are stored in sessionStorage — cleared when the tab closes.
+ * Tokens are stored in storage — cleared when the tab closes.
  * The IdToken auto-refreshes 5 minutes before expiry using the RefreshToken.
  */
 
@@ -19,6 +19,10 @@ import {
 } from 'react'
 
 const SESSION_KEY = 'triageai_session'
+
+function getStorage(): Storage {
+  return sessionStorage
+}
 
 export interface AuthUser {
   id: string
@@ -87,13 +91,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   function persistUser(authUser: AuthUser) {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(authUser))
+    getStorage().setItem(SESSION_KEY, JSON.stringify(authUser))
     setUser(authUser)
   }
 
   const logout = useCallback(() => {
     if (refreshTimer.current) clearTimeout(refreshTimer.current)
-    sessionStorage.removeItem(SESSION_KEY)
+    getStorage().removeItem(SESSION_KEY)
     setUser(null)
   }, [])
 
@@ -127,10 +131,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, msUntilRefresh)
   }, [logout])
 
-  // Restore session from sessionStorage on mount
+  // Restore session from storage on mount
   useEffect(() => {
     try {
-      const stored = sessionStorage.getItem(SESSION_KEY)
+      const stored = getStorage().getItem(SESSION_KEY)
       if (stored) {
         const parsed: AuthUser = JSON.parse(stored)
         // If the stored token is already expired, don't restore it
@@ -138,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(parsed)
           scheduleRefresh(parsed)
         } else {
-          sessionStorage.removeItem(SESSION_KEY)
+          getStorage().removeItem(SESSION_KEY)
         }
       }
     } catch {

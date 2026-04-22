@@ -336,6 +336,19 @@ All served by Next.js Route Handlers at `{clinic}.usetriageai.com/api/`:
 
 ---
 
+## Pre-Production Blockers (Required Before Real PHI)
+
+The following must be completed before any real patient data is processed:
+
+| Blocker | Status | Notes |
+|---------|--------|-------|
+| CloudWatch no-PHI logging policy | ⛔ Open | Log groups need an explicit policy preventing PHI from appearing in CloudWatch. Structured logs currently emit only UUIDs/enums, but a formal policy must be attached to the log groups before go-live. |
+| Penetration test | ⛔ Open | Full external pentest required before processing real patient data. Must cover auth bypass, subdomain isolation, S3 access, and API authorization boundaries. |
+
+> These are hard blockers — **do not process real PHI until both are resolved.**
+
+---
+
 ## HIPAA Compliance
 
 TriageAI is designed for HIPAA compliance from day one:
