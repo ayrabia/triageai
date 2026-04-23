@@ -10,8 +10,9 @@ import {
   CognitoIdentityProviderClient,
   AdminEnableUserCommand,
   AdminDisableUserCommand,
+  AdminUserGlobalSignOutCommand,
 } from '@aws-sdk/client-cognito-identity-provider'
-import { sql } from '../../_lib/db'
+import { sql, writeAuditLog } from '../../_lib/db'
 import { withAuth, requireRole, handleError, ApiError } from '../../_lib/auth'
 
 export const dynamic = 'force-dynamic'
@@ -63,9 +64,18 @@ export async function PATCH(
         UserPoolId: USER_POOL_ID,
         Username: target.email,
       }))
+      // Invalidate all existing sessions immediately — deactivated user cannot
+      // use a still-valid JWT to access the API after this point
+      await cognito.send(new AdminUserGlobalSignOutCommand({
+        UserPoolId: USER_POOL_ID,
+        Username: target.email,
+      }))
     }
 
     await sql`UPDATE users SET is_active = ${body.is_active} WHERE id = ${id}`
+
+    const action = body.is_active ? 'user_reactivated' : 'user_deactivated'
+    await writeAuditLog(null, actor.id, action, null, { target_user_id: id, email: target.email })
 
     return NextResponse.json({ ok: true, is_active: body.is_active })
   } catch (err) {

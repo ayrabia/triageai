@@ -10,7 +10,7 @@ import {
   CognitoIdentityProviderClient,
   AdminCreateUserCommand,
 } from '@aws-sdk/client-cognito-identity-provider'
-import { sql } from '../../_lib/db'
+import { sql, writeAuditLog } from '../../_lib/db'
 import { withAuth, requireRole, handleError, ApiError } from '../../_lib/auth'
 import crypto from 'crypto'
 
@@ -55,6 +55,8 @@ export async function POST(request: NextRequest) {
       INSERT INTO users (id, email, name, role, clinic_id, auth_provider_id, is_active)
       VALUES (${crypto.randomUUID()}, ${email}, ${name}, ${role}, ${user.clinic_id}, ${sub}, true)
     `
+
+    await writeAuditLog(null, user.id, 'user_invited', null, { email, role, clinic_id: user.clinic_id })
 
     return NextResponse.json({ ok: true, email, role }, { status: 201 })
   } catch (err) {

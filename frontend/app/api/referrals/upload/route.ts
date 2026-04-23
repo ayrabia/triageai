@@ -52,6 +52,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ detail: 'File too large. Maximum size is 50 MB.' }, { status: 413 })
     }
 
+    // Verify PDF magic bytes — rejects files that lie about their Content-Type
+    if (buffer.slice(0, 4).toString('ascii') !== '%PDF') {
+      return NextResponse.json({ detail: 'File does not appear to be a valid PDF.' }, { status: 400 })
+    }
+
     // Pre-generate UUID so it's both the referral ID and the S3 key — Lambda
     // parses the UUID from the key to avoid a race-condition DB lookup
     const referralId = crypto.randomUUID()

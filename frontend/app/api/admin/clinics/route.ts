@@ -4,9 +4,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { sql } from '../../_lib/db'
+import { sql, writeAuditLog } from '../../_lib/db'
 import { withAuth, requireRole, handleError, ApiError } from '../../_lib/auth'
 import crypto from 'crypto'
+
+const MAX_CRITERIA = 30
+const MAX_CRITERION_LENGTH = 300
+const INJECTION_PATTERN = /ignore|override|disregard|forget|system\s*prompt|instruction|new\s*task/i
 
 export const dynamic = 'force-dynamic'
 
@@ -56,6 +60,22 @@ export async function POST(request: NextRequest) {
       throw new ApiError(400, 'slug must be lowercase alphanumeric with hyphens only')
     }
 
+    // Sanitize criteria — prevent prompt injection into the pipeline
+    if (urgent_criteria.length > MAX_CRITERIA) {
+      throw new ApiError(400, `Maximum ${MAX_CRITERIA} criteria allowed`)
+    }
+    for (const criterion of urgent_criteria) {
+      if (typeof criterion !== 'string' || criterion.trim().length === 0) {
+        throw new ApiError(400, 'Each criterion must be a non-empty string')
+      }
+      if (criterion.length > MAX_CRITERION_LENGTH) {
+        throw new ApiError(400, `Each criterion must be ${MAX_CRITERION_LENGTH} characters or fewer`)
+      }
+      if (INJECTION_PATTERN.test(criterion)) {
+        throw new ApiError(400, 'Criterion contains disallowed content')
+      }
+    }
+
     const existing = await sql`SELECT id FROM clinics WHERE slug = ${slug} LIMIT 1`
     if (existing.length > 0) {
       throw new ApiError(409, `Subdomain '${slug}' is already taken`)
@@ -68,6 +88,8 @@ export async function POST(request: NextRequest) {
       INSERT INTO clinics (id, name, slug, specialty, criteria)
       VALUES (${clinicId}, ${name}, ${slug}, ${specialty}, ${sql.json(criteria as never)})
     `
+
+    await writeAuditLog(null, user.id, 'clinic_created', null, { clinic_id: clinicId, name, slug, specialty })
 
     return NextResponse.json({ id: clinicId, name, slug, specialty }, { status: 201 })
   } catch (err) {
