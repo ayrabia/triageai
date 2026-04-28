@@ -6,13 +6,12 @@ import type { Physician } from '@/lib/types'
 
 interface Props {
   referralId: string
-  token: string
   isOpen: boolean
   onClose: () => void
-  onRouted: () => void
+  onRouted: (physicianName: string) => void
 }
 
-export default function RouteModal({ referralId, token, isOpen, onClose, onRouted }: Props) {
+export default function RouteModal({ referralId, isOpen, onClose, onRouted }: Props) {
   const [physicians, setPhysicians] = useState<Physician[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -24,19 +23,19 @@ export default function RouteModal({ referralId, token, isOpen, onClose, onRoute
     setSelected(null)
     setError(null)
     setFetching(true)
-    getPhysicians(token)
+    getPhysicians()
       .then(setPhysicians)
       .catch(() => setError('Could not load physicians. Please try again.'))
       .finally(() => setFetching(false))
-  }, [isOpen, token])
+  }, [isOpen])
 
   async function handleRoute() {
     if (!selected) return
     setLoading(true)
     setError(null)
     try {
-      await routeReferral(referralId, selected, token)
-      onRouted()
+      await routeReferral(referralId, selected)
+      onRouted(selectedPhysician?.name ?? 'MD')
       onClose()
     } catch {
       setError('Failed to route referral. Please try again.')

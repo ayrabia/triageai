@@ -115,10 +115,14 @@ cur.execute(
 
 ### Current users
 
-| Email | Role | Clinic |
-|-------|------|--------|
-| `ayman@usetriageai.com` | ADMIN | Sacramento ENT |
-| `nadia.rabia@usetriageai.com` | COORDINATOR | Sacramento ENT |
+| Email | Role | Name |
+|-------|------|------|
+| `ayman@usetriageai.com` | superadmin | Ayman Rabia |
+| `coordinator@usetriageai.com` | COORDINATOR | Test Coordinator |
+| `drphysician@usetriageai.com` | PHYSICIAN | Dr. Physician |
+| `reviewer@usetriageai.com` | REVIEWER | Test Reviewer |
+
+All dev accounts use password: `TriageAI-Dev-2026!`
 
 Clinic ID for Sacramento ENT: `00000000-0000-0000-0000-000000000001`
 

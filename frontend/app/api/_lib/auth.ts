@@ -7,6 +7,9 @@
  *
  * The verifier caches the Cognito JWKS in memory — same behaviour as the
  * Python @lru_cache in app/auth.py.
+ *
+ * Auth tokens are stored in HttpOnly cookies (id_token, refresh_token).
+ * They are never accessible to client-side JavaScript.
  */
 
 import { CognitoJwtVerifier } from 'aws-jwt-verify'
@@ -79,13 +82,53 @@ export function handleError(err: unknown): NextResponse {
  * Mirrors FastAPI's get_current_user dependency — clinic_id is always derived
  * from this user object, never from request parameters.
  */
-export async function withAuth(request: NextRequest): Promise<DbUser> {
-  const authHeader = request.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    throw new ApiError(401, 'Missing or invalid Authorization header')
+/** Decode JWT exp claim without re-verifying (call only after withAuth succeeds). */
+export function getJwtExpiry(jwt: string): number {
+  try {
+    const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url').toString())
+    return payload.exp * 1000
+  } catch {
+    return Date.now() + 3600_000
   }
+}
 
-  const token = authHeader.slice(7)
+/** Set auth cookies on a response. refreshToken is only passed on initial login. */
+export function setAuthCookies(
+  response: NextResponse,
+  idToken: string,
+  refreshToken?: string,
+): void {
+  const secure = process.env.NODE_ENV === 'production'
+  const maxAge = Math.max(60, Math.floor((getJwtExpiry(idToken) - Date.now()) / 1000))
+  response.cookies.set('id_token', idToken, {
+    httpOnly: true,
+    secure,
+    sameSite: 'strict',
+    maxAge,
+    path: '/',
+  })
+  if (refreshToken) {
+    response.cookies.set('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure,
+      sameSite: 'strict',
+      maxAge: 30 * 24 * 60 * 60,
+      path: '/api/refresh',
+    })
+  }
+}
+
+/** Clear auth cookies (call on logout). */
+export function clearAuthCookies(response: NextResponse): void {
+  response.cookies.set('id_token', '', { maxAge: 0, path: '/' })
+  response.cookies.set('refresh_token', '', { maxAge: 0, path: '/api/refresh' })
+}
+
+export async function withAuth(request: NextRequest): Promise<DbUser> {
+  const token = request.cookies.get('id_token')?.value
+  if (!token) {
+    throw new ApiError(401, 'Not authenticated')
+  }
 
   let sub: string
   try {

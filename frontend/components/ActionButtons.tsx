@@ -17,9 +17,9 @@ interface Props {
   referralId: string
   currentStatus: ReferralStatus
   currentAction: ReferralAction | null
-  token: string
   userRole: string
   onRouteClick?: () => void
+  onRouted?: (physicianName: string) => void
 }
 
 const btn: Record<string, string> = {
@@ -34,12 +34,22 @@ const BASE = 'py-2 px-3 rounded text-sm font-medium disabled:opacity-50 disabled
 const WIDE = 'w-full py-2.5 px-4 rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed'
 
 export default function ActionButtons({
-  referralId, currentStatus, currentAction, token, userRole, onRouteClick,
+  referralId, currentStatus, currentAction, userRole, onRouteClick, onRouted,
 }: Props) {
   const router = useRouter()
   const [schedulingWindow, setSchedulingWindow] = useState('')
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [confirmed, setConfirmed] = useState<string | null>(null)
+
+  if (confirmed) {
+    return (
+      <div className="flex items-start gap-3 rounded border border-secondary-container/40 bg-secondary-container/20 px-4 py-3">
+        <span className="material-symbols-outlined text-secondary-container mt-0.5" style={{ fontSize: '18px' }}>check_circle</span>
+        <p className="text-sm font-medium text-on-surface">{confirmed}</p>
+      </div>
+    )
+  }
 
   if (currentStatus === 'failed') {
     return (
@@ -57,17 +67,28 @@ export default function ActionButtons({
     return <p className="text-xs text-on-surface-variant">Patient has been scheduled.</p>
   }
 
-  async function act(newStatus: ReferralStatus, extra?: { scheduling_window?: string }) {
+  async function act(newStatus: ReferralStatus, extra?: { scheduling_window?: string }, confirmMsg?: string) {
     setLoading(newStatus)
     setError(null)
     try {
-      await updateStatus(referralId, newStatus, token, extra)
-      router.refresh()
+      await updateStatus(referralId, newStatus, extra)
+      if (confirmMsg) {
+        setConfirmed(confirmMsg)
+        setTimeout(() => router.refresh(), 2000)
+      } else {
+        router.refresh()
+      }
     } catch {
       setError('Failed to update. Please try again.')
     } finally {
       setLoading(null)
     }
+  }
+
+  function handleRouted(physicianName: string) {
+    setConfirmed(`Escalated to ${physicianName} — referral added to their queue`)
+    setTimeout(() => router.refresh(), 2000)
+    onRouted?.(physicianName)
   }
 
   const busy = loading !== null
@@ -130,7 +151,7 @@ export default function ActionButtons({
     return (
       <div className="flex flex-col gap-3">
         <button
-          onClick={() => act('approved_for_scheduling')}
+          onClick={() => act('approved_for_scheduling', undefined, 'Sent to scheduling inbox — coordinator has been notified')}
           disabled={busy}
           className={`${WIDE} ${btn.primary}`}
         >
@@ -195,7 +216,7 @@ export default function ActionButtons({
         </div>
 
         <button
-          onClick={() => act('approved_for_scheduling', { scheduling_window: schedulingWindow })}
+          onClick={() => act('approved_for_scheduling', { scheduling_window: schedulingWindow }, 'Approved — referral sent to the scheduling inbox')}
           disabled={busy || !schedulingWindow}
           className={`${WIDE} ${btn.primary}`}
         >

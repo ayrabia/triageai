@@ -70,9 +70,7 @@ export default function SuperadminPage() {
   const fetchClinics = useCallback(async () => {
     if (!user) return
     try {
-      const res = await fetch('/api/admin/clinics', {
-        headers: { Authorization: `Bearer ${user.idToken}` },
-      })
+      const res = await fetch('/api/admin/clinics')
       if (res.ok) setClinics(await res.json())
     } finally {
       setLoading(false)
@@ -102,7 +100,7 @@ export default function SuperadminPage() {
     try {
       const res = await fetch('/api/admin/clinics', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${user!.idToken}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: clinicName,
           slug: clinicSlug,
@@ -128,7 +126,7 @@ export default function SuperadminPage() {
     try {
       const res = await fetch(`/api/admin/clinics/${selectedClinic.id}/admins`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${user!.idToken}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: adminName, email: adminEmail }),
       })
       const data = await res.json()

@@ -6,11 +6,10 @@ import { SCHEDULING_WINDOWS } from '@/components/ActionButtons'
 
 interface Props {
   referralId: string
-  token: string
   onSuccess: () => void
 }
 
-export default function PhysicianResponsePanel({ referralId, token, onSuccess }: Props) {
+export default function PhysicianResponsePanel({ referralId, onSuccess }: Props) {
   const [schedulingWindow, setSchedulingWindow] = useState('')
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,7 +20,7 @@ export default function PhysicianResponsePanel({ referralId, token, onSuccess }:
     setLoading(true)
     setError(null)
     try {
-      await respondToReferral(referralId, { physician_note: note, scheduling_window: schedulingWindow }, token)
+      await respondToReferral(referralId, { physician_note: note, scheduling_window: schedulingWindow })
       onSuccess()
     } catch {
       setError('Failed to submit. Please try again.')

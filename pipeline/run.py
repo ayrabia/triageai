@@ -48,85 +48,150 @@ _DEFAULT_CRITERIA = [
 ]
 
 
-def _build_prompt(criteria: list[str]) -> str:
+def _build_system_prompt(criteria: list[str]) -> str:
     criteria_block = "\n".join(f"- {c}" for c in criteria)
     return f"""You are reviewing a faxed medical referral for a specialty clinic.
 
 IMPORTANT DISTINCTION: Referral documents often contain the patient's ENTIRE medical history
 (problem list) mixed in with the actual reason for the referral. You must carefully separate these.
 
-For this referral, extract and organize the following information:
+Extract and classify the referral using the classify_referral tool.
 
-1. REFERRAL REASON: What is the SPECIFIC reason this patient was referred? Look for the chief
-   complaint, reason for consultation, or the specific issue that prompted the referral.
+REFERRAL REASON: The SPECIFIC reason this patient was referred — the chief complaint, reason
+for consultation, or the issue that prompted the referral.
 
-2. RELEVANT CLINICAL FINDINGS: Key symptoms, exam findings, and history DIRECTLY RELATED to
-   the referral reason only. Ignore unrelated conditions from the problem list.
+RELEVANT CLINICAL FINDINGS: Key symptoms, exam findings, and history DIRECTLY RELATED to
+the referral reason only. Ignore unrelated conditions from the problem list.
 
-3. IMAGING SUMMARY: If any imaging (CT, MRI, X-ray) is mentioned:
-   - Summarize the key findings/impressions
-   - If imaging is referenced but the actual report is NOT attached, flag it as:
-     "MISSING: [type of imaging] referenced but report not included"
+IMAGING SUMMARY: If any imaging (CT, MRI, X-ray) is mentioned, summarize the key
+findings/impressions. If imaging is referenced but the report is NOT attached, write:
+"MISSING: [type] referenced but report not included". Null if no imaging mentioned.
 
-4. MISSING INFORMATION: What expected documents or data are absent? Common missing items:
-   CT/MRI reports, lab results, clinical notes, referring physician contact info.
+MISSING INFORMATION: Expected documents or data that are absent (CT/MRI reports, lab results,
+clinical notes, referring physician contact info).
 
-5. PROVIDER URGENCY LABEL: Look for any indication of how the REFERRING PROVIDER marked
-   urgency: priority fields, STAT/URGENT labels, provider notes, insurance priority status.
-   Report exactly what you found — the label and where you found it.
-   If no urgency label is present, report "No urgency label found in document."
+PROVIDER URGENCY LABEL: How the REFERRING PROVIDER marked urgency — priority fields,
+STAT/URGENT labels, provider notes, insurance priority status. Report the label and exactly
+where you found it. If none: label = "none found".
 
-6. CRITERIA CHECK:
-Compare the referral against these urgent criteria:
+THREE-TIER CLASSIFICATION — choose exactly one:
 
+  PRIORITY REVIEW:
+    Clinical content matches one or more urgent criteria below, REGARDLESS of provider label.
+
+  SECONDARY APPROVAL:
+    Provider marked urgent/stat/priority BUT clinical content does NOT match any urgent
+    criteria. NEVER silently downgrade a provider's urgent label.
+
+  STANDARD QUEUE:
+    No urgent criteria matched AND provider did NOT mark urgent. Both must be true.
+
+Urgent criteria for this clinic:
 {criteria_block}
 
-   Apply this THREE-TIER classification logic:
+CRITICAL: action MUST match your reasoning. STANDARD QUEUE requires BOTH: no criteria
+matched AND provider did not mark urgent. Double-check before submitting.
 
-   TIER 1 — "PRIORITY REVIEW":
-     The clinical content matches one or more urgent criteria, REGARDLESS of what
-     the referring provider labeled it.
+SUMMARY: 2-3 sentence plain-language summary for a referral coordinator.
 
-   TIER 2 — "SECONDARY APPROVAL":
-     The referring provider marked the referral as urgent/stat/priority, BUT the
-     clinical content does NOT match any of the defined urgent criteria above.
-     NEVER silently downgrade a provider's urgent label.
+NEXT STEPS: One-sentence scheduling recommendation based on the classification."""
 
-   TIER 3 — "STANDARD QUEUE":
-     No urgent criteria matched AND the referring provider did NOT mark it as urgent.
 
-   CRITICAL RULE: The "action" field in your JSON output MUST match your reasoning.
-   STANDARD QUEUE is ONLY for cases where no criteria matched AND the provider did
-   NOT mark it as urgent. Double-check your action field against your reasoning before outputting.
-
-7. SUMMARY: A 2-3 sentence plain-language summary a referral coordinator can read quickly.
-
-8. NEXT STEPS: Based on the classification tier and the matched criteria, provide a
-   one-sentence scheduling recommendation for the triage coordinator.
-
-Output your response as structured JSON with these exact keys:
-{{
-    "referral_reason": "...",
-    "relevant_clinical_findings": ["...", "..."],
-    "imaging_summary": "..." or null,
-    "missing_information": ["...", "..."],
-    "provider_urgency_label": {{
-        "label": "urgent" or "routine" or "stat" or "none found",
-        "source": "where in the document this was found"
-    }},
-    "criteria_check": {{
-        "action": "PRIORITY REVIEW" or "SECONDARY APPROVAL" or "STANDARD QUEUE",
-        "matched_criteria": ["..."] or [],
-        "evidence": ["..."] or [],
-        "provider_label": "urgent" or "routine" or "stat" or "elective" or "none found",
-        "referring_clinic_classification": "the urgency label exactly as written, or null",
-        "reasoning": "...",
-        "recommended_window": "the recommended scheduling window if PRIORITY REVIEW, or null"
-    }},
-    "next_steps": "...",
-    "summary": "..."
-}}
-"""
+_CLASSIFY_TOOL = {
+    "name": "classify_referral",
+    "description": "Record the structured classification of a faxed medical referral.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "referral_reason": {
+                "type": "string",
+                "description": "The specific reason this patient was referred.",
+            },
+            "relevant_clinical_findings": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Key findings directly related to the referral reason.",
+            },
+            "imaging_summary": {
+                "type": ["string", "null"],
+                "description": "Imaging findings summary, or null if none mentioned.",
+            },
+            "missing_information": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Expected documents or data that are absent.",
+            },
+            "provider_urgency_label": {
+                "type": "object",
+                "description": "How the referring provider marked urgency.",
+                "properties": {
+                    "label": {
+                        "type": "string",
+                        "enum": ["urgent", "stat", "routine", "elective", "none found"],
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "Where in the document this label was found.",
+                    },
+                },
+                "required": ["label", "source"],
+            },
+            "action": {
+                "type": "string",
+                "enum": ["PRIORITY REVIEW", "SECONDARY APPROVAL", "STANDARD QUEUE"],
+                "description": "Triage classification tier. Must match reasoning.",
+            },
+            "matched_criteria": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Urgent criteria that matched. Empty if none.",
+            },
+            "evidence": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Verbatim quotes from the document supporting the classification.",
+            },
+            "provider_label": {
+                "type": "string",
+                "enum": ["urgent", "stat", "routine", "elective", "none found"],
+                "description": "Normalised provider urgency label.",
+            },
+            "referring_clinic_classification": {
+                "type": ["string", "null"],
+                "description": "Urgency label exactly as written in the document, or null.",
+            },
+            "reasoning": {
+                "type": "string",
+                "description": "Step-by-step reasoning for the chosen action tier.",
+            },
+            "recommended_window": {
+                "type": ["string", "null"],
+                "description": "Scheduling window for PRIORITY REVIEW cases, else null.",
+            },
+            "next_steps": {
+                "type": "string",
+                "description": "One-sentence scheduling recommendation.",
+            },
+            "summary": {
+                "type": "string",
+                "description": "2-3 sentence plain-language summary for the coordinator.",
+            },
+        },
+        "required": [
+            "referral_reason",
+            "relevant_clinical_findings",
+            "missing_information",
+            "provider_urgency_label",
+            "action",
+            "matched_criteria",
+            "evidence",
+            "provider_label",
+            "reasoning",
+            "next_steps",
+            "summary",
+        ],
+    },
+}
 
 
 # Maps Claude's exact action string → ReferralAction enum
@@ -167,10 +232,14 @@ def _pdf_to_images(s3_key: str) -> list[dict]:
     return _pdf_to_images_from_path(local_path)
 
 
-def _call_claude(image_content: list[dict], prompt: str) -> dict:
-    """Send page images + prompt to Claude via Bedrock. Returns parsed JSON."""
-    payload = image_content + [{"type": "text", "text": prompt}]
+def _call_claude(image_content: list[dict], system_prompt: str) -> dict:
+    """Send page images to Claude via Bedrock using tool use. Returns tool input dict.
 
+    Instructions live in the system prompt (operator-trusted). The user message
+    contains only the PDF images (untrusted data). tool_choice forces Claude to
+    respond exclusively via the classify_referral schema — it cannot produce
+    free-form text, so injected instructions inside the PDF have no effect.
+    """
     bedrock = boto3.client(
         "bedrock-runtime",
         region_name=AWS_REGION,
@@ -184,36 +253,35 @@ def _call_claude(image_content: list[dict], prompt: str) -> dict:
             {
                 "anthropic_version": "bedrock-2023-05-31",
                 "max_tokens": 4096,
-                "messages": [{"role": "user", "content": payload}],
+                "system": system_prompt,
+                "tools": [_CLASSIFY_TOOL],
+                "tool_choice": {"type": "tool", "name": "classify_referral"},
+                "messages": [{"role": "user", "content": image_content}],
             }
         ),
     )
 
-    raw = json.loads(response["body"].read())["content"][0]["text"].strip()
+    body = json.loads(response["body"].read())
+    for block in body.get("content", []):
+        if block.get("type") == "tool_use" and block.get("name") == "classify_referral":
+            return block["input"]
 
-    # Strip markdown code fences if present
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
-
-    return json.loads(raw)
+    raise ValueError("Claude did not invoke classify_referral — check model response")
 
 
 def _apply_result(referral: Referral, result: dict, elapsed_ms: int) -> None:
-    """Map Claude's JSON output onto a Referral ORM object in-place."""
-    cc = result.get("criteria_check", {})
-    action_str = cc.get("action", "")
-
+    """Map classify_referral tool input onto a Referral ORM object in-place."""
     referral.referral_reason = result.get("referral_reason")
     referral.relevant_clinical_findings = result.get("relevant_clinical_findings")
     referral.imaging_summary = result.get("imaging_summary")
     referral.missing_information = result.get("missing_information")
     referral.provider_urgency_label = result.get("provider_urgency_label")
-    referral.action = _ACTION_MAP.get(action_str)
-    referral.matched_criteria = cc.get("matched_criteria")
-    referral.evidence = cc.get("evidence")
-    referral.provider_label = cc.get("provider_label")
-    referral.reasoning = cc.get("reasoning")
-    referral.recommended_window = cc.get("recommended_window")
+    referral.action = _ACTION_MAP.get(result.get("action", ""))
+    referral.matched_criteria = result.get("matched_criteria")
+    referral.evidence = result.get("evidence")
+    referral.provider_label = result.get("provider_label")
+    referral.reasoning = result.get("reasoning")
+    referral.recommended_window = result.get("recommended_window")
     referral.next_steps = result.get("next_steps")
     referral.summary = result.get("summary")
     referral.status = ReferralStatus.READY
@@ -256,8 +324,8 @@ def process_referral(referral_id: UUID, s3_key: str) -> None:
             raise ValueError(f"Referral {referral_id} not found in DB")
 
         criteria = _get_clinic_criteria(db, referral.clinic_id)
-        prompt = _build_prompt(criteria)
-        result = _call_claude(image_content, prompt)
+        system_prompt = _build_system_prompt(criteria)
+        result = _call_claude(image_content, system_prompt)
         elapsed_ms = int((time.monotonic() - t0) * 1000)
 
         _apply_result(referral, result, elapsed_ms)
@@ -319,8 +387,8 @@ def process_referral_from_bytes(referral_id: UUID, pdf_bytes: bytes) -> None:
             raise ValueError(f"Referral {referral_id} not found in DB")
 
         criteria = _get_clinic_criteria(db, referral.clinic_id)
-        prompt = _build_prompt(criteria)
-        result = _call_claude(image_content, prompt)
+        system_prompt = _build_system_prompt(criteria)
+        result = _call_claude(image_content, system_prompt)
         elapsed_ms = int((time.monotonic() - t0) * 1000)
 
         _apply_result(referral, result, elapsed_ms)

@@ -28,12 +28,13 @@ export default function ReferralDetailPage({ params }: Props) {
   const [pdfLoading, setPdfLoading] = useState(false)
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [routeModalOpen, setRouteModalOpen] = useState(false)
+  const [escalationMsg, setEscalationMsg] = useState<string | null>(null)
 
   useEffect(() => {
     if (authLoading) return
     if (!user) { router.replace('/login'); return }
 
-    getReferral(params.id, user.idToken)
+    getReferral(params.id)
       .then(setReferral)
       .catch((err) => {
         if (err instanceof Error) {
@@ -72,7 +73,7 @@ export default function ReferralDetailPage({ params }: Props) {
     setPdfLoading(true)
     setPdfError(null)
     try {
-      const url = await getPdfUrl(params.id, user!.idToken)
+      const url = await getPdfUrl(params.id)
       setPdfUrl(url)
       setPdfOpen(true)
     } catch {
@@ -87,10 +88,12 @@ export default function ReferralDetailPage({ params }: Props) {
 
       <RouteModal
         referralId={referral.id}
-        token={user!.idToken}
         isOpen={routeModalOpen}
         onClose={() => setRouteModalOpen(false)}
-        onRouted={() => router.refresh()}
+        onRouted={(physicianName) => {
+          setEscalationMsg(`Escalated to ${physicianName} — referral added to their queue`)
+          setTimeout(() => { setEscalationMsg(null); router.refresh() }, 2500)
+        }}
       />
 
       {/* Header */}
@@ -294,14 +297,20 @@ export default function ReferralDetailPage({ params }: Props) {
               <h2 className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider mb-4">
                 Triage Actions
               </h2>
-              <ActionButtons
-                referralId={referral.id}
-                currentStatus={referral.status}
-                currentAction={referral.action}
-                token={user!.idToken}
-                userRole={user!.role}
-                onRouteClick={() => setRouteModalOpen(true)}
-              />
+              {escalationMsg ? (
+                <div className="flex items-start gap-3 rounded border border-secondary-container/40 bg-secondary-container/20 px-4 py-3">
+                  <span className="material-symbols-outlined text-secondary-container mt-0.5" style={{ fontSize: '18px' }}>check_circle</span>
+                  <p className="text-sm font-medium text-on-surface">{escalationMsg}</p>
+                </div>
+              ) : (
+                <ActionButtons
+                  referralId={referral.id}
+                  currentStatus={referral.status}
+                  currentAction={referral.action}
+                  userRole={user!.role}
+                  onRouteClick={() => setRouteModalOpen(true)}
+                />
+              )}
             </section>
 
             {/* MD Decision panel — PHYSICIAN responds when escalated to them */}
@@ -310,8 +319,7 @@ export default function ReferralDetailPage({ params }: Props) {
               && referral.routed_to === user!.id && (
               <PhysicianResponsePanel
                 referralId={referral.id}
-                token={user!.idToken}
-                onSuccess={() => getReferral(params.id, user!.idToken).then(setReferral)}
+                onSuccess={() => getReferral(params.id).then(setReferral)}
               />
             )}
 

@@ -20,7 +20,7 @@ export default function SchedulingInboxPage() {
   const fetchData = useCallback(async () => {
     if (!user) return
     try {
-      const data = await getQueue(user.idToken, { status: 'approved_for_scheduling' })
+      const data = await getQueue({ status: 'approved_for_scheduling' })
       setReferrals(data)
       setError(false)
     } catch (err) {

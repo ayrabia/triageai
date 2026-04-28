@@ -21,7 +21,7 @@ export default function MyQueuePage() {
   const fetchReferrals = useCallback(async () => {
     if (!user) return
     try {
-      const data = await getQueue(user.idToken, { assignedToMe: true })
+      const data = await getQueue({ assignedToMe: true })
       setReferrals(data.filter((r) => r.status !== 'archived'))
       setFetchError(false)
     } catch (err) {

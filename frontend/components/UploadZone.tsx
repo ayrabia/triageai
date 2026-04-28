@@ -4,7 +4,6 @@ import { useCallback, useRef, useState } from 'react'
 import { uploadReferral } from '@/lib/api'
 
 interface Props {
-  token: string
   onUploaded: () => void
 }
 
@@ -14,7 +13,7 @@ interface FileStatus {
   error?: string
 }
 
-export default function UploadZone({ token, onUploaded }: Props) {
+export default function UploadZone({ onUploaded }: Props) {
   const [dragging, setDragging] = useState(false)
   const [files, setFiles] = useState<FileStatus[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
@@ -29,7 +28,7 @@ export default function UploadZone({ token, onUploaded }: Props) {
     await Promise.all(
       pdfs.map(async (file, i) => {
         try {
-          await uploadReferral(file, token)
+          await uploadReferral(file)
           setFiles((prev) =>
             prev.map((s, j) => (j === i ? { ...s, state: 'done' } : s))
           )
@@ -47,7 +46,7 @@ export default function UploadZone({ token, onUploaded }: Props) {
     )
 
     setTimeout(() => setFiles([]), 6000)
-  }, [token, onUploaded])
+  }, [onUploaded])
 
   function onDragOver(e: React.DragEvent) {
     e.preventDefault()

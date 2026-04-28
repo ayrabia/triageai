@@ -56,11 +56,12 @@ const TIERS = [
 ]
 
 function countAll(referrals: ReferralSummary[], myUserId?: string) {
+  const ready = referrals.filter((r) => r.status === 'ready')
   const active = referrals.filter((r) => r.status !== 'archived' && r.status !== 'scheduled')
   return {
-    'PRIORITY REVIEW':    active.filter((r) => r.action === 'PRIORITY REVIEW').length,
-    'SECONDARY APPROVAL': active.filter((r) => r.action === 'SECONDARY APPROVAL').length,
-    'STANDARD QUEUE':     active.filter((r) => r.action === 'STANDARD QUEUE').length,
+    'PRIORITY REVIEW':    ready.filter((r) => r.action === 'PRIORITY REVIEW').length,
+    'SECONDARY APPROVAL': ready.filter((r) => r.action === 'SECONDARY APPROVAL').length,
+    'STANDARD QUEUE':     ready.filter((r) => r.action === 'STANDARD QUEUE').length,
     escalated_to_md:      active.filter((r) => r.status === 'escalated_to_md').length,
     md_reviewed:          active.filter((r) => r.status === 'md_reviewed').length,
     approved_for_scheduling: referrals.filter((r) => r.status === 'approved_for_scheduling').length,
@@ -82,7 +83,7 @@ export default function HomePage() {
   const fetchQueue = useCallback(async () => {
     if (!user) return
     try {
-      const data = await getQueue(user.idToken)
+      const data = await getQueue()
       setReferrals(data)
       setFetchError(false)
     } catch (err) {
@@ -115,7 +116,6 @@ export default function HomePage() {
 
   const role = user.role
   const counts = countAll(referrals, user.id)
-  const total = counts.total
 
   return (
     <div className="min-h-screen bg-surface">
@@ -168,7 +168,7 @@ export default function HomePage() {
         {role === 'coordinator' && (
           <>
             <section className="mb-10">
-              <UploadZone token={user.idToken} onUploaded={fetchQueue} />
+              <UploadZone onUploaded={fetchQueue} />
             </section>
             <div className="mb-5">
               <h2 className="text-lg font-bold tracking-tight text-primary">Scheduling Inbox</h2>
@@ -209,7 +209,7 @@ export default function HomePage() {
           <>
             {role === 'admin' && (
               <section className="mb-10">
-                <UploadZone token={user.idToken} onUploaded={fetchQueue} />
+                <UploadZone onUploaded={fetchQueue} />
               </section>
             )}
 

@@ -23,7 +23,7 @@ export default function PendingQueue() {
     if (!user) return
     setDismissing((prev) => new Set(prev).add(id))
     try {
-      await updateStatus(id, 'archived', user.idToken)
+      await updateStatus(id, 'archived')
       setReferrals((prev) => prev.filter((r) => r.id !== id))
     } finally {
       setDismissing((prev) => { const s = new Set(prev); s.delete(id); return s })
@@ -34,8 +34,8 @@ export default function PendingQueue() {
     if (!user) return
     try {
       const [pending, failed] = await Promise.all([
-        getQueue(user.idToken, { status: 'pending' }),
-        getQueue(user.idToken, { status: 'failed' }),
+        getQueue({ status: 'pending' }),
+        getQueue({ status: 'failed' }),
       ])
       const processing = pending.filter((r) => !r.action)
       setReferrals([...processing, ...failed])

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '../../_lib/db'
-import { withAuth, handleError } from '../../_lib/auth'
+import { withAuth, handleError, getJwtExpiry } from '../../_lib/auth'
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
     }
 
     const clinic = clinics[0]
+    const token = request.cookies.get('id_token')?.value ?? ''
     return NextResponse.json({
       id: user.id,
       email: user.email,
@@ -22,6 +23,7 @@ export async function GET(request: NextRequest) {
       clinic_id: user.clinic_id,
       clinic_name: clinic.name,
       clinic_specialty: clinic.specialty,
+      expiresAt: getJwtExpiry(token),
     })
   } catch (err) {
     return handleError(err)

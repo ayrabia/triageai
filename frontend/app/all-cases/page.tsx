@@ -21,7 +21,7 @@ export default function AllCasesPage() {
   const fetchReferrals = useCallback(async () => {
     if (!user) return
     try {
-      const data = await getQueue(user.idToken)
+      const data = await getQueue()
       setReferrals(data.filter((r) => r.status !== 'archived'))
       setFetchError(false)
     } catch (err) {

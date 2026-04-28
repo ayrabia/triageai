@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { setAuthCookies, getJwtExpiry } from '../../_lib/auth'
 
 const COGNITO_REGION = process.env.NEXT_PUBLIC_COGNITO_REGION ?? 'us-east-1'
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_APP_CLIENT_ID ?? ''
@@ -50,5 +51,7 @@ export async function POST(req: NextRequest) {
 
   const idToken: string = data.AuthenticationResult.IdToken
   const refreshToken: string = data.AuthenticationResult.RefreshToken
-  return NextResponse.json({ idToken, refreshToken })
+  const response = NextResponse.json({ expiresAt: getJwtExpiry(idToken) })
+  setAuthCookies(response, idToken, refreshToken)
+  return response
 }

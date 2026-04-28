@@ -48,9 +48,7 @@ export default function TeamPage() {
   const fetchMembers = useCallback(async () => {
     if (!user) return
     try {
-      const res = await fetch('/api/users', {
-        headers: { Authorization: `Bearer ${user.idToken}` },
-      })
+      const res = await fetch('/api/users')
       if (res.ok) setMembers(await res.json())
     } finally {
       setLoading(false)
@@ -71,7 +69,7 @@ export default function TeamPage() {
     try {
       const res = await fetch('/api/users/invite', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${user!.idToken}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: inviteName, email: inviteEmail, role: inviteRole }),
       })
       const data = await res.json()
@@ -88,7 +86,7 @@ export default function TeamPage() {
     try {
       const res = await fetch(`/api/users/${member.id}`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${user!.idToken}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !member.is_active }),
       })
       if (res.ok) {

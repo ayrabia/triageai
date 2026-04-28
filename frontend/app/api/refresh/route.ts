@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { setAuthCookies, getJwtExpiry } from '../_lib/auth'
 
 const COGNITO_REGION = process.env.NEXT_PUBLIC_COGNITO_REGION ?? 'us-east-1'
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_APP_CLIENT_ID ?? ''
 const COGNITO_ENDPOINT = `https://cognito-idp.${COGNITO_REGION}.amazonaws.com/`
 
 export async function POST(req: NextRequest) {
-  const { refreshToken } = await req.json()
+  const refreshToken = req.cookies.get('refresh_token')?.value
 
   if (!refreshToken) {
-    return NextResponse.json({ error: 'refreshToken required.' }, { status: 400 })
+    return NextResponse.json({ error: 'No session.' }, { status: 401 })
   }
 
   const cognitoRes = await fetch(COGNITO_ENDPOINT, {
@@ -30,5 +31,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Session expired. Please sign in again.' }, { status: 401 })
   }
 
-  return NextResponse.json({ idToken: data.AuthenticationResult.IdToken })
+  const idToken: string = data.AuthenticationResult.IdToken
+  const response = NextResponse.json({ expiresAt: getJwtExpiry(idToken) })
+  setAuthCookies(response, idToken)
+  return response
 }
