@@ -382,6 +382,8 @@ TriageAI is designed for HIPAA compliance from day one:
 - **RDS SSL enforced** — `rds.force_ssl=1`, all clients use `sslmode=require`
 - Role-based access control — COORDINATOR, REVIEWER, PHYSICIAN, ADMIN
 - Multi-clinic data isolation enforced at query level (`clinic_id` scoping) and subdomain level (`x-clinic-slug` middleware)
+- **Auth tokens in HttpOnly cookies** — tokens never accessible to client-side JavaScript; XSS cannot steal sessions
+- **Pipeline prompt injection hardened** — Claude invoked via tool use; instructions in system prompt, PDF images in user message only; `action` is a strict enum (cannot be overridden by content in a malicious fax)
 
 > **Important:** TriageAI is an **administrative workflow tool**, not a clinical decision support system. The AI surfaces information — triage staff make all final decisions.
 
@@ -419,12 +421,13 @@ TriageAI is designed for HIPAA compliance from day one:
 - [x] Subdomain-based clinic portals with auth isolation (`sacent.usetriageai.com`)
 - [x] Full role system — COORDINATOR, REVIEWER, PHYSICIAN, ADMIN
 - [x] Complete scheduling workflow — escalation → MD decision → scheduler → confirmed
+- [x] CloudWatch no-PHI logging policy — retention set, code audit complete (April 2026)
+- [x] Auth tokens in HttpOnly cookies — sessionStorage vulnerability closed (April 2026)
+- [x] Pipeline prompt injection hardened — tool use mode, system/user separation (April 2026)
 - [ ] Clinical validation — Nadia Rabia (SacENT)
-- [ ] Phaxio fax ingestion
-- [ ] Clinic branding on portal login page
-- [ ] Clinic onboarding automation (currently manual)
-- [ ] CloudWatch no-PHI logging policy
 - [ ] Penetration test before go-live with real PHI
+- [ ] Phaxio fax ingestion
+- [ ] Clinic onboarding automation (currently manual DNS step)
 - [ ] Cardiology specialty criteria
 - [ ] Orthopedics specialty criteria
 
