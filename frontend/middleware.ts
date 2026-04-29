@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const NON_CLINIC_SUBDOMAINS = new Set(['www', 'api', ''])
-const CLINIC_PORTAL_PATH = '/clinic-portal'
 
 export function middleware(request: NextRequest) {
-  const host = (request.headers.get('host') ?? '').split(':')[0]
+  // x-forwarded-host is set by the ALB and reflects the public hostname;
+  // host can be the internal ECS hostname behind a proxy
+  const host = (request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? '').split(':')[0]
   const subdomain = getSubdomain(host)
 
   if (!subdomain || NON_CLINIC_SUBDOMAINS.has(subdomain) || subdomain === 'app') return NextResponse.next()

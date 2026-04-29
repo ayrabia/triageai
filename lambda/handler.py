@@ -77,6 +77,31 @@ def _wait_for_referral(referral_id: uuid_lib.UUID, max_attempts: int = 3) -> boo
     return False
 
 
+def _write_orphan_audit(referral_id: uuid_lib.UUID, s3_key: str) -> None:
+    """
+    Write a pipeline_orphaned audit entry when the referral row never appeared.
+
+    referral_id is NULL in this entry — the row didn't exist — but the
+    audit_log.referral_id column is nullable so this is valid. The
+    expected_referral_id in new_value lets ops trace back to the S3 object.
+    """
+    from db.models import AuditLog
+    db = SessionLocal()
+    try:
+        db.add(AuditLog(
+            referral_id=None,
+            user_id=None,
+            action="pipeline_orphaned",
+            new_value={"s3_key": s3_key, "expected_referral_id": str(referral_id)},
+        ))
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        print(f"[pipeline] failed to write orphan audit: {type(exc).__name__}")
+    finally:
+        db.close()
+
+
 def _cleanup_tmp(s3_key: str, referral_id: uuid_lib.UUID) -> None:
     """Remove files written to /tmp during pipeline execution."""
     for path in [
@@ -116,7 +141,8 @@ def main(event: dict, context) -> dict:
 
         # Wait for the DB row to be committed (race condition mitigation)
         if not _wait_for_referral(referral_id):
-            print(f"[pipeline] referral {referral_id} not found in DB after retries, skipping")
+            print(f"[pipeline] pipeline_orphaned referral_id={referral_id} s3_key={s3_key}")
+            _write_orphan_audit(referral_id, s3_key)
             continue
 
         try:

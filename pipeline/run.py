@@ -22,6 +22,7 @@ from pathlib import Path
 from uuid import UUID
 
 import boto3
+import botocore.exceptions
 from botocore.config import Config
 
 from db.enums import ReferralAction, ReferralStatus
@@ -232,6 +233,9 @@ def _pdf_to_images(s3_key: str) -> list[dict]:
     return _pdf_to_images_from_path(local_path)
 
 
+_RETRYABLE_BEDROCK_ERRORS = {"ThrottlingException", "ServiceUnavailableException"}
+
+
 def _call_claude(image_content: list[dict], system_prompt: str) -> dict:
     """Send page images to Claude via Bedrock using tool use. Returns tool input dict.
 
@@ -239,34 +243,46 @@ def _call_claude(image_content: list[dict], system_prompt: str) -> dict:
     contains only the PDF images (untrusted data). tool_choice forces Claude to
     respond exclusively via the classify_referral schema — it cannot produce
     free-form text, so injected instructions inside the PDF have no effect.
+
+    Retries up to 3 times with exponential backoff on Bedrock throttling/service errors.
     """
     bedrock = boto3.client(
         "bedrock-runtime",
         region_name=AWS_REGION,
         config=Config(read_timeout=120, connect_timeout=10),
     )
-    response = bedrock.invoke_model(
-        modelId=CLAUDE_MODEL_ID,
-        contentType="application/json",
-        accept="application/json",
-        body=json.dumps(
-            {
-                "anthropic_version": "bedrock-2023-05-31",
-                "max_tokens": 4096,
-                "system": system_prompt,
-                "tools": [_CLASSIFY_TOOL],
-                "tool_choice": {"type": "tool", "name": "classify_referral"},
-                "messages": [{"role": "user", "content": image_content}],
-            }
-        ),
+    payload = json.dumps(
+        {
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": 4096,
+            "system": system_prompt,
+            "tools": [_CLASSIFY_TOOL],
+            "tool_choice": {"type": "tool", "name": "classify_referral"},
+            "messages": [{"role": "user", "content": image_content}],
+        }
     )
 
-    body = json.loads(response["body"].read())
-    for block in body.get("content", []):
-        if block.get("type") == "tool_use" and block.get("name") == "classify_referral":
-            return block["input"]
-
-    raise ValueError("Claude did not invoke classify_referral — check model response")
+    for attempt in range(3):
+        try:
+            response = bedrock.invoke_model(
+                modelId=CLAUDE_MODEL_ID,
+                contentType="application/json",
+                accept="application/json",
+                body=payload,
+            )
+            body = json.loads(response["body"].read())
+            for block in body.get("content", []):
+                if block.get("type") == "tool_use" and block.get("name") == "classify_referral":
+                    return block["input"]
+            raise ValueError("Claude did not invoke classify_referral — check model response")
+        except botocore.exceptions.ClientError as exc:
+            code = exc.response["Error"]["Code"]
+            if code in _RETRYABLE_BEDROCK_ERRORS and attempt < 2:
+                wait = 2 ** attempt  # 1s, then 2s
+                print(f"[pipeline] Bedrock {code}, attempt {attempt + 1}/3, retrying in {wait}s")
+                time.sleep(wait)
+                continue
+            raise
 
 
 def _apply_result(referral: Referral, result: dict, elapsed_ms: int) -> None:

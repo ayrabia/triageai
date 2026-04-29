@@ -12,6 +12,22 @@ const nextConfig = {
           // Prevents presigned S3 URLs from leaking via Referer header
           { key: 'Referrer-Policy', value: 'no-referrer' },
           { key: 'Permissions-Policy', value: 'geolocation=(), camera=(), microphone=(), payment=()' },
+          {
+            key: 'Content-Security-Policy',
+            // unsafe-inline required: Next.js injects inline scripts for hydration and __NEXT_DATA__
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline'",
+              // unsafe-inline for styles: Next.js injects critical CSS inline; googleapis for Material Symbols
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "font-src 'self' https://fonts.gstatic.com",
+              "img-src 'self' data: blob:",
+              "connect-src 'self'",
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+            ].join('; '),
+          },
         ],
       },
     ]

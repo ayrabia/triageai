@@ -29,6 +29,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
+# AWS RDS CA bundle — required for rejectUnauthorized: true against RDS
+COPY certs/rds-ca.pem ./certs/rds-ca.pem
+ENV NODE_EXTRA_CA_CERTS=/app/certs/rds-ca.pem
+
 EXPOSE 3000
 ENV PORT=3000
 

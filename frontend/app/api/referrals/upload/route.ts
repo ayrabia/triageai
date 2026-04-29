@@ -57,6 +57,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ detail: 'File does not appear to be a valid PDF.' }, { status: 400 })
     }
 
+    // Rate limit: 50 uploads per clinic per hour — prevents runaway S3/Bedrock costs
+    const [{ count }] = await sql<{ count: string }[]>`
+      SELECT COUNT(*)::text AS count FROM referrals
+      WHERE clinic_id = ${user.clinic_id}
+      AND received_at > NOW() - INTERVAL '1 hour'
+    `
+    if (parseInt(count, 10) >= 50) {
+      return NextResponse.json({ detail: 'Upload rate limit exceeded. Maximum 50 uploads per hour per clinic.' }, { status: 429 })
+    }
+
     // Pre-generate UUID so it's both the referral ID and the S3 key — Lambda
     // parses the UUID from the key to avoid a race-condition DB lookup
     const referralId = crypto.randomUUID()

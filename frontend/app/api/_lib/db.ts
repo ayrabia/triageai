@@ -34,7 +34,7 @@ function getPool(): ReturnType<typeof postgres> {
     max: 10,
     idle_timeout: 20,
     connect_timeout: 10,
-    ssl: { rejectUnauthorized: false }, // RDS uses AWS-managed certs; sslmode=require is enforced above
+    ssl: { rejectUnauthorized: true }, // AWS RDS CA bundle set via NODE_EXTRA_CA_CERTS in Dockerfile
   })
 
   // Cache in global so dev hot reloads reuse the same pool

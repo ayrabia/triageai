@@ -13,6 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { sql, writeAuditLog } from '../../_lib/db'
 import { handleError, ApiError } from '../../_lib/auth'
 
@@ -48,7 +49,12 @@ export async function POST(request: NextRequest) {
     if (!authHeader?.startsWith('Bearer ')) {
       throw new ApiError(401, 'Missing Authorization header')
     }
-    if (!PIPELINE_SECRET || authHeader.slice(7) !== PIPELINE_SECRET) {
+    const provided = authHeader.slice(7)
+    if (
+      !PIPELINE_SECRET ||
+      provided.length !== PIPELINE_SECRET.length ||
+      !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(PIPELINE_SECRET))
+    ) {
       throw new ApiError(401, 'Invalid pipeline secret')
     }
 
