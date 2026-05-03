@@ -44,6 +44,38 @@ export interface ReferralSummary {
   routed_to: string | null
 }
 
+export interface ReferralNote {
+  id: string
+  referral_id: string
+  clinic_id: string
+  author_id: string | null
+  author_name: string
+  author_role: string
+  body: string
+  created_at: string
+}
+
+export interface ArchivedReferral {
+  id: string
+  filename: string | null
+  action: ReferralAction | null
+  referral_reason: string | null
+  summary: string | null
+  received_at: string
+  patient_name: string | null
+  patient_dob: string | null
+  referring_provider: string | null
+}
+
+export interface PatientRecord {
+  patient_name: string | null
+  patient_dob: string | null
+  referring_provider: string | null
+  referral_count: number
+  last_referral_at: string
+  referrals: ArchivedReferral[]
+}
+
 export interface ReferralDetail {
   id: string
   clinic_id: string
@@ -51,6 +83,9 @@ export interface ReferralDetail {
   status: ReferralStatus
   action: ReferralAction | null
   filename: string | null
+  patient_name: string | null
+  patient_dob: string | null
+  referring_provider: string | null
   referral_reason: string | null
   relevant_clinical_findings: string[] | null
   imaging_summary: string | null

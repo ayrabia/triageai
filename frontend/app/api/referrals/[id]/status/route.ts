@@ -27,7 +27,7 @@ import { withAuth, handleError, ApiError } from '../../../_lib/auth'
 export const dynamic = 'force-dynamic'
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  ready:                   ['approved_for_scheduling', 'reviewed', 'archived'],
+  ready:                   ['approved_for_scheduling', 'scheduled', 'reviewed', 'archived'],
   escalated_to_md:         ['archived'],
   md_reviewed:             ['approved_for_scheduling', 'archived'],
   approved_for_scheduling: ['scheduled', 'archived'],

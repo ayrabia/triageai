@@ -67,7 +67,7 @@ function countAll(referrals: ReferralSummary[], myUserId?: string) {
     approved_for_scheduling: referrals.filter((r) => r.status === 'approved_for_scheduling').length,
     processing:           referrals.filter((r) => r.status === 'pending' && !r.action).length,
     failed:               referrals.filter((r) => r.status === 'failed').length,
-    myQueue:              myUserId ? referrals.filter((r) => r.routed_to === myUserId).length : 0,
+    myQueue:              myUserId ? referrals.filter((r) => r.routed_to === myUserId && r.status !== 'archived').length : 0,
     total:                active.length,
   }
 }
@@ -199,6 +199,16 @@ export default function HomePage() {
                 count={counts.processing + counts.failed}
                 countBg={counts.failed > 0 ? 'bg-error text-on-error' : 'bg-surface-container-high text-on-surface-variant'}
                 spin={counts.failed === 0 && counts.processing > 0}
+              />
+              <NavCard
+                href="/archive"
+                title="Scheduled Archive"
+                description="Patient records for all scheduled referrals — search by name"
+                icon="folder_open"
+                borderColor="border-l-outline-variant"
+                iconBg="bg-surface-container-high"
+                iconColor="text-on-surface-variant"
+                countBg="bg-surface-container-high text-on-surface-variant"
               />
             </div>
           </>
@@ -358,6 +368,16 @@ export default function HomePage() {
                   countBg="bg-surface-container-high text-on-surface-variant"
                 />
               )}
+              <NavCard
+                href="/archive"
+                title="Scheduled Archive"
+                description="Patient records for all scheduled referrals — search by name"
+                icon="folder_open"
+                borderColor="border-l-outline-variant"
+                iconBg="bg-surface-container-high"
+                iconColor="text-on-surface-variant"
+                countBg="bg-surface-container-high text-on-surface-variant"
+              />
             </div>
           </>
         )}
@@ -400,7 +420,7 @@ function NavCard({ href, title, description, icon, borderColor, iconBg, iconColo
   borderColor: string
   iconBg: string
   iconColor: string
-  count: number
+  count?: number
   countBg: string
   spin?: boolean
 }) {
@@ -420,7 +440,7 @@ function NavCard({ href, title, description, icon, borderColor, iconBg, iconColo
             <div>
               <h3 className="text-base font-bold tracking-tight text-on-surface flex items-center gap-2 group-hover:text-primary transition-colors">
                 {title}
-                {count > 0 && (
+                {!!count && count > 0 && (
                   <span className={`text-xs font-bold px-2 py-0.5 rounded ${countBg}`}>
                     {count}
                   </span>

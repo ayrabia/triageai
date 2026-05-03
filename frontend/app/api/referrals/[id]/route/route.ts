@@ -18,7 +18,7 @@ export async function POST(
 ) {
   try {
     const user = await withAuth(request)
-    requireRole(user, 'reviewer', 'admin')
+    requireRole(user, 'reviewer', 'admin', 'superadmin')
 
     const { id } = params
     const { physician_id } = await request.json() as { physician_id?: string }

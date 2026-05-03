@@ -120,6 +120,18 @@ class Referral(Base):
     next_steps: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # --- Patient demographics (extracted by pipeline) ---
+    patient_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    patient_dob: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    referring_provider: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+    # --- Scheduling fields (migration 0005) ---
+    scheduling_window: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    physician_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    escalated_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+
     # --- Processing metadata ---
     model_used: Mapped[str | None] = mapped_column(String(100), nullable=True)
     processing_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -154,6 +166,34 @@ class Referral(Base):
 
     clinic: Mapped["Clinic"] = relationship("Clinic", back_populates="referrals")
     audit_log: Mapped[list["AuditLog"]] = relationship("AuditLog", back_populates="referral")
+    notes: Mapped[list["ReferralNote"]] = relationship(
+        "ReferralNote", back_populates="referral", order_by="ReferralNote.created_at"
+    )
+
+
+class ReferralNote(Base):
+    __tablename__ = "referral_notes"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    referral_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("referrals.id", ondelete="CASCADE"), nullable=False
+    )
+    clinic_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("clinics.id", ondelete="RESTRICT"), nullable=False
+    )
+    author_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    author_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    author_role: Mapped[str] = mapped_column(String(50), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    referral: Mapped["Referral"] = relationship("Referral", back_populates="notes")
 
 
 class AuditLog(Base):

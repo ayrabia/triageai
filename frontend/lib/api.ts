@@ -1,4 +1,4 @@
-import type { Physician, ReferralDetail, ReferralStatus, ReferralSummary } from './types'
+import type { ArchivedReferral, Physician, ReferralDetail, ReferralNote, ReferralStatus, ReferralSummary } from './types'
 
 const BASE = '/api'
 
@@ -95,5 +95,31 @@ export async function routeReferral(
   if (res.status === 401) throw new Error('UNAUTHORIZED')
   if (res.status === 403) throw new Error('FORBIDDEN')
   if (!res.ok) throw new Error(`Failed to escalate referral: ${res.status}`)
+  return res.json()
+}
+
+export async function getNotes(referralId: string): Promise<ReferralNote[]> {
+  const res = await fetch(`${BASE}/referrals/${referralId}/notes`, { cache: 'no-store' })
+  if (res.status === 401) throw new Error('UNAUTHORIZED')
+  if (!res.ok) throw new Error(`Failed to fetch notes: ${res.status}`)
+  return res.json()
+}
+
+export async function postNote(referralId: string, body: string): Promise<ReferralNote> {
+  const res = await fetch(`${BASE}/referrals/${referralId}/notes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  })
+  if (res.status === 401) throw new Error('UNAUTHORIZED')
+  if (!res.ok) throw new Error(`Failed to post note: ${res.status}`)
+  return res.json()
+}
+
+export async function getArchive(): Promise<ArchivedReferral[]> {
+  const res = await fetch(`${BASE}/archive`, { cache: 'no-store' })
+  if (res.status === 401) throw new Error('UNAUTHORIZED')
+  if (res.status === 403) throw new Error('FORBIDDEN')
+  if (!res.ok) throw new Error(`Failed to fetch archive: ${res.status}`)
   return res.json()
 }

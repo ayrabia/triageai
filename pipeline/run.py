@@ -104,6 +104,18 @@ _CLASSIFY_TOOL = {
     "input_schema": {
         "type": "object",
         "properties": {
+            "patient_name": {
+                "type": ["string", "null"],
+                "description": "Full patient name as written in the document, or null if not found.",
+            },
+            "patient_dob": {
+                "type": ["string", "null"],
+                "description": "Patient date of birth as written in the document (any format), or null if not found.",
+            },
+            "referring_provider": {
+                "type": ["string", "null"],
+                "description": "Name of the referring physician or provider, or null if not found.",
+            },
             "referral_reason": {
                 "type": "string",
                 "description": "The specific reason this patient was referred.",
@@ -287,6 +299,9 @@ def _call_claude(image_content: list[dict], system_prompt: str) -> dict:
 
 def _apply_result(referral: Referral, result: dict, elapsed_ms: int) -> None:
     """Map classify_referral tool input onto a Referral ORM object in-place."""
+    referral.patient_name = result.get("patient_name")
+    referral.patient_dob = result.get("patient_dob")
+    referral.referring_provider = result.get("referring_provider")
     referral.referral_reason = result.get("referral_reason")
     referral.relevant_clinical_findings = result.get("relevant_clinical_findings")
     referral.imaging_summary = result.get("imaging_summary")

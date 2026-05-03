@@ -121,11 +121,34 @@ export default function ActionButtons({
 
   // ── COORDINATOR ────────────────────────────────────────────────────────────
   if (userRole === 'coordinator') {
+    // Cleared by triage/MD — ready to schedule
     if (currentStatus === 'approved_for_scheduling') {
       return (
         <div className="flex flex-col gap-3">
-          <button onClick={() => act('scheduled')} disabled={busy} className={`${WIDE} ${btn.success}`}>
-            {loading === 'scheduled' ? 'Saving…' : 'Confirm Scheduled'}
+          <button
+            onClick={() => act('scheduled', undefined, 'Patient marked as scheduled')}
+            disabled={busy}
+            className={`${WIDE} ${btn.success}`}
+          >
+            {loading === 'scheduled' ? 'Saving…' : 'Mark Scheduled'}
+          </button>
+          <button onClick={() => act('archived')} disabled={busy} className={`${WIDE} ${btn.muted}`}>
+            {loading === 'archived' ? 'Saving…' : 'Archive'}
+          </button>
+          {error && <p className="text-xs text-error">{error}</p>}
+        </div>
+      )
+    }
+    // STANDARD QUEUE — coordinator schedules directly, no triage step needed
+    if (currentStatus === 'ready' && currentAction === 'STANDARD QUEUE') {
+      return (
+        <div className="flex flex-col gap-3">
+          <button
+            onClick={() => act('scheduled', undefined, 'Patient marked as scheduled')}
+            disabled={busy}
+            className={`${WIDE} ${btn.success}`}
+          >
+            {loading === 'scheduled' ? 'Saving…' : 'Mark Scheduled'}
           </button>
           <button onClick={() => act('archived')} disabled={busy} className={`${WIDE} ${btn.muted}`}>
             {loading === 'archived' ? 'Saving…' : 'Archive'}

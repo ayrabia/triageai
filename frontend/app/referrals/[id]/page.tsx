@@ -9,8 +9,10 @@ import PriorityBadge from '@/components/PriorityBadge'
 import ActionButtons from '@/components/ActionButtons'
 import RouteModal from '@/components/RouteModal'
 import PhysicianResponsePanel from '@/components/PhysicianResponsePanel'
+import NotesThread from '@/components/NotesThread'
+import EpicPanel from '@/components/EpicPanel'
 import { ACTION_CONFIG, STATUS_CONFIG, formatDateTime, formatRelativeTime } from '@/lib/utils'
-import type { ReferralDetail } from '@/lib/types'
+import type { ReferralDetail, ReferralNote } from '@/lib/types'
 
 interface Props {
   params: { id: string }
@@ -29,6 +31,7 @@ export default function ReferralDetailPage({ params }: Props) {
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [routeModalOpen, setRouteModalOpen] = useState(false)
   const [escalationMsg, setEscalationMsg] = useState<string | null>(null)
+  const [notes, setNotes] = useState<ReferralNote[]>([])
 
   useEffect(() => {
     if (authLoading) return
@@ -368,6 +371,33 @@ export default function ReferralDetailPage({ params }: Props) {
             )}
           </div>
         </div>
+
+        {/* Notes thread */}
+        {referral.action && (
+          <div className="mt-8">
+            <section className="bg-surface-container-lowest rounded-lg border border-outline-variant/15 p-6">
+              <h2 className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider mb-4 pb-3 border-b border-outline-variant/15 flex items-center gap-2">
+                <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>chat</span>
+                Notes & Communication
+              </h2>
+              <NotesThread
+                referralId={referral.id}
+                onNotesLoaded={setNotes}
+              />
+            </section>
+          </div>
+        )}
+
+        {/* Epic export panel */}
+        {referral.action && (
+          <div className="mt-6">
+            <h2 className="text-sm font-semibold text-on-surface-variant uppercase tracking-wider mb-3 flex items-center gap-2">
+              <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>screenshot_monitor</span>
+              Epic Export
+            </h2>
+            <EpicPanel referral={referral} notes={notes} />
+          </div>
+        )}
 
         {/* PDF viewer */}
         <div className="mt-8">

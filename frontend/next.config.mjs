@@ -23,6 +23,8 @@ const nextConfig = {
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob:",
               "connect-src 'self'",
+              // Allow S3 presigned URLs to load in the PDF iframe
+              "frame-src 'self' https://triageai-test-referrals.s3.amazonaws.com https://triageai-test-referrals.s3.us-east-1.amazonaws.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
