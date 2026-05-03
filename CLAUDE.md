@@ -243,7 +243,7 @@ This is a **safety requirement** — wrong action field silently drops urgent pa
 - `.env` contains secrets — never commit it, never log it
 
 ### AWS BAA Coverage
-- AWS Bedrock, RDS, S3, Cognito, App Runner are all covered under the existing AWS BAA
+- AWS Bedrock, RDS, S3, Cognito, ECS, Lambda are all covered under the existing AWS BAA
 - GPT-4o fallback in `classifier.py` is NOT BAA-covered — do not route real PHI through it
 
 ### Logging rules
@@ -257,8 +257,7 @@ This is a **safety requirement** — wrong action field silently drops urgent pa
 - Every staff view, status change, or export must write an audit entry
 
 ### Authentication
-- `get_current_user` in `app/dependencies.py` verifies Cognito JWTs and looks up the user by `auth_provider_id` (Cognito `sub`) in the `users` table
-- Auth is real and live — Cognito JWT verification is implemented in `app/auth.py`
+- `withAuth` in `frontend/app/api/_lib/auth.ts` verifies Cognito JWTs and looks up the user by `auth_provider_id` (Cognito `sub`) in the `users` table
 
 ### Multi-clinic data isolation
 - Every DB query on `referrals` and `audit_log` must filter by `clinic_id`
@@ -270,7 +269,7 @@ This is a **safety requirement** — wrong action field silently drops urgent pa
 - [x] ECS + Lambda deployment on ECR
 - [x] Configure RDS to reject non-SSL connections — `rds.force_ssl=1` in custom param group `triageai-postgres16`, `sslmode=require` in all client URLs
 - [x] HTTPS enforced — TLS 1.3 on ALB, HTTP→HTTPS redirect
-- [x] ALLOWED_ORIGINS — N/A for Next.js Route Handlers (same-origin architecture; was a FastAPI concern only)
+- [x] ALLOWED_ORIGINS — N/A for Next.js Route Handlers (same-origin architecture)
 - [x] Enable RDS automated backups with 6-year retention — AWS Backup plan `triageai-hipaa-6yr`, vault `triageai-hipaa-vault`, 2190-day retention; RDS deletion protection enabled
 - [ ] Set up CloudWatch log groups with no PHI logging policy
 - [ ] Penetration test before go-live

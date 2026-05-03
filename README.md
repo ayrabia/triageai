@@ -355,7 +355,6 @@ The following must be completed before any real patient data is processed:
 |-----------|-----------|-------|
 | `/aws/lambda/triageai-pipeline` | 365 days | Active — Lambda pipeline |
 | `/ecs/triageai-frontend` | 365 days | Active — ECS Next.js frontend |
-| `/aws/apprunner/triageai-*` | 30 days | Decommissioned App Runner (expiring) |
 | `/aws/lambda/triageai-check-db` | 30 days | Temp migration Lambda (expiring) |
 | `/aws/lambda/triageai-cleanup` | 30 days | Temp migration Lambda (expiring) |
 | `/aws/lambda/triageai-migrate-onboarding` | 30 days | Temp migration Lambda (expiring) |
